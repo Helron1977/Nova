@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Styles personnalisés pour le plugin prose (typography) */
+@layer base {
+    /* Améliorations pour les listes de tâches */
+    .prose li > input[type="checkbox"]:first-child,
+    .prose-invert li > input[type="checkbox"]:first-child {
+        margin-right: 0.5rem;
+        vertical-align: middle;
+        /* Optionnel: Vous pouvez ajouter d'autres styles ici si nécessaire */
+        /* Par exemple: cursor: pointer; s'ils deviennent interactifs */
+    }
+    
+    .prose li:has(> input[type="checkbox"]:first-child) {
+        list-style-type: none;
+        margin-left: -1.25rem;
+        padding-left: 0px;
+        /* La valeur de margin-left peut nécessiter un ajustement fin */
+    }
+    .prose-invert li:has(> input[type="checkbox"]:first-child) {
+        list-style-type: none;
+        margin-left: -1.25rem;
+        padding-left: 0px;
+    }
+}
+
+/* --- Début des styles copiés/personnalisés --- */
+
+/* Style de base du handle: caché par défaut (avec !important) */
+.dnd-handle {
+    opacity: 0 !important;
+}
+
+/* CAS 1: Rendre visible au survol du wrapper (pour les listes/cas avec enfants) */
+/* Le handle est un ENFANT direct */
+[data-dnd-wrapper]:hover > .dnd-handle {
+  opacity: 0.5 !important; /* Ajouter !important ici aussi par cohérence et sûreté */
+}
+
+/* CAS 2: Rendre visible au survol d'un élément standard SANS wrapper */
+/* Le handle est un FRERE (pas nécessairement adjacent) */
+[data-dnd-wrapper]:hover ~ .dnd-handle {
+  opacity: 0.5 !important; /* Ajouter !important ici aussi par cohérence et sûreté */
+}
+
+/* Augmenter l'opacité au survol direct du handle lui-même (commun aux deux cas) */
+.dnd-handle:hover {
+   opacity: 1 !important; /* Déjà présent */
+}
+
+/* Autres styles personnalisés potentiels ici */
+
+/* --- Styles pour imiter Prose dans les wrappers DND --- */
+/* Cibler les éléments rendus par BlockComponent à l'intérieur du wrapper */
+
+/* Titres */
+.prose [data-dnd-wrapper] h1 {
+  @apply text-3xl sm:text-4xl font-extrabold tracking-tight mb-6 mt-8 dark:text-slate-200;
+}
+.prose [data-dnd-wrapper] h2 {
+  @apply text-2xl sm:text-3xl font-semibold tracking-tight mb-4 mt-6 dark:text-slate-200;
+}
+.prose [data-dnd-wrapper] h3 {
+  @apply text-xl sm:text-2xl font-semibold mb-4 mt-5 dark:text-slate-200;
+}
+/* Ajouter h4, h5, h6 si nécessaire */
+
+/* Paragraphe */
+.prose [data-dnd-wrapper] p {
+  @apply mb-5 leading-relaxed dark:text-slate-400;
+}
+
+/* Listes */
+/* Cibler TOUS les ul/ol sous le wrapper */
+.prose [data-dnd-wrapper] ul,
+.prose [data-dnd-wrapper] ol {
+  @apply pl-6 mb-1 dark:text-slate-400; /* Réduire légèrement la marge basse pour les listes imbriquées */
+}
+.prose [data-dnd-wrapper] ul {
+  @apply list-disc;
+}
+.prose [data-dnd-wrapper] ol {
+  @apply list-decimal;
+}
+/* On peut cibler li plus largement car ils sont forcément dans ul/ol */
+.prose [data-dnd-wrapper] li {
+  @apply my-1; /* Ajouter un peu d'espace vertical aux items */
+}
+
+/* Blockquote */
+.prose [data-dnd-wrapper] blockquote {
+   @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-6;
+}
+
+/* Code Blocks */
+.prose [data-dnd-wrapper] pre {
+  @apply bg-gray-100 dark:bg-gray-800 rounded-md p-4 my-6 overflow-x-auto;
+}
+.prose [data-dnd-wrapper] pre code {
+  @apply text-sm bg-transparent dark:bg-transparent rounded-none p-0;
+}
+
+/* Code Inline (ne doit pas être dans pre) */
+.prose [data-dnd-wrapper] :not(pre) > code {
+  @apply bg-gray-200 dark:bg-gray-700 rounded px-1 py-0.5 text-sm font-mono;
+}
+
+/* Liens */
+.prose [data-dnd-wrapper] a {
+    @apply text-blue-600 dark:text-blue-400 hover:underline;
+}
+
+/* Ligne Horizontale (Thematic Break) */
+.prose [data-dnd-wrapper] hr {
+    @apply my-8 border-gray-200 dark:border-gray-700; 
+}
+
+/* Tableaux */
+.prose [data-dnd-wrapper] table {
+  @apply w-full table-auto border-collapse text-left my-6 text-sm;
+}
+.prose [data-dnd-wrapper] thead {
+  @apply border-b border-gray-300 dark:border-gray-600;
+}
+.prose [data-dnd-wrapper] th {
+  @apply px-4 py-2 font-semibold text-gray-800 dark:text-slate-200 text-left;
+}
+.prose [data-dnd-wrapper] td {
+  @apply px-4 py-2 border-b border-gray-200 dark:border-gray-700 align-top dark:text-slate-400;
+}
+.prose [data-dnd-wrapper] tbody tr:last-child td {
+  @apply border-b-0; /* Enlever la bordure du bas pour la dernière ligne */
+}
+
+/* Styles spécifiques pour ol déjà inclus via la règle générale ul, ol et la règle > ol */
+
+/* Ajouter ici d'autres éléments si nécessaire (strong, em...) */
+/* --- Fin des styles copiés/personnalisés --- */ 
