@@ -279,8 +279,8 @@ function App() {
             items={blockIds} // Utiliser les IDs (potentiellement préfixés)
             strategy={verticalListSortingStrategy} 
           >
-            {/* La div prose doit rester ici pour appliquer les styles de typographie */}
-            <div className="prose dark:prose-invert max-w-none pb-96">
+            {/* Appliquer la largeur max et supprimer max-w-none */}
+            <div className="prose dark:prose-invert max-w-4xl mx-auto pb-96 bg-white dark:bg-gray-800 rounded-md shadow-md">
               <MarkdownRenderer 
                 blocks={blocks} 
                 // Ne pas passer sortableIds ici
