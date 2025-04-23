@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
 import type { MermaidBlock } from '@/application/logic/markdownParser';
+import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+
+// Instancier le logger
+const logger = new PinoLogger();
 
 interface CustomMermaidRendererProps {
   block: MermaidBlock;
@@ -27,7 +31,8 @@ const CustomMermaidRenderer = React.forwardRef<
           mermaidRef.current.innerHTML = result.svg;
           
         } catch (e) {
-          console.error('Mermaid rendering error:', e);
+          // Utiliser logger.error
+          logger.error(`Mermaid rendering error for block ${block.id}:`, e);
           if (mermaidRef.current) {
             mermaidRef.current.innerHTML = 'Error rendering Mermaid diagram.';
           }

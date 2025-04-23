@@ -2,6 +2,18 @@
 
 /* Styles personnalisés pour le plugin prose (typography) */
 @layer base {
+    /* --- Fond style Bloc-notes --- */
+    body {
+      background-color: #f8f8f0 !important; /* Ajouter !important par précaution */
+      /* Lignes horizontales légères */
+      background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px) !important;
+      background-size: 100% 1.5em !important; /* Espacement des lignes (ajuster si besoin) */
+      /* Optionnel: Marge rouge sur le côté */
+      /* border-left: 3px solid rgba(255, 0, 0, 0.4); */
+    }
+
+    /* --- Fin Fond style Bloc-notes --- */
+
     /* Améliorations pour les listes de tâches */
     .prose li > input[type="checkbox"]:first-child,
     .prose-invert li > input[type="checkbox"]:first-child {
@@ -23,6 +35,12 @@
         padding-left: 0px;
     }
 }
+
+/* --- Assurer la transparence de l'élément racine React --- */
+#root {
+  background-color: transparent !important; 
+}
+/* --- Fin Transparence Racine --- */
 
 /* --- Début des styles copiés/personnalisés --- */
 

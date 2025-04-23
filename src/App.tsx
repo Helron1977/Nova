@@ -267,7 +267,7 @@ function App() {
   }, [blocks]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
+    <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200`}>
       <Header />
       <MainContent>
         <DndContext 
@@ -275,17 +275,17 @@ function App() {
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          {/* Envelopper les éléments triables avec SortableContext */}
           <SortableContext 
-            key={blockIds.join('-')}
             items={blockIds} // Utiliser les IDs (potentiellement préfixés)
-            strategy={verticalListSortingStrategy} // Utiliser la stratégie importée
+            strategy={verticalListSortingStrategy} 
           >
+            {/* La div prose doit rester ici pour appliquer les styles de typographie */}
             <div className="prose dark:prose-invert max-w-none pb-96">
               <MarkdownRenderer 
                 blocks={blocks} 
+                // Ne pas passer sortableIds ici
                 onDeleteBlock={handleDeleteBlock} 
-                onAddBlockAfter={handleAddBlockAfter} 
+                onAddBlockAfter={handleAddBlockAfter}
               />
             </div>
           </SortableContext>

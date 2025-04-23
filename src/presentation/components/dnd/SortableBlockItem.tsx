@@ -6,6 +6,10 @@ import { markdownComponentsConfig } from '@/presentation/config/markdownComponen
 import { GripVertical, Trash2, Plus } from 'lucide-react';
 import { Pilcrow, Heading1, Heading2, SquareCode, GitGraph, Image, Quote, Table, Codepen, Minus } from 'lucide-react';
 
+// << AJOUT: Importer le logger >>
+import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+const logger = new PinoLogger();
+
 interface SortableBlockItemProps {
   block: Block;
   children?: React.ReactNode; // Peut être des enfants directs (ListGroup) ou rien
@@ -31,7 +35,8 @@ const blockTypes = [
 export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, children, onDelete, onAddAfter}) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showInsertIndicator, setShowInsertIndicator] = useState(false);
+  const closeMenuTimerRef = useRef<NodeJS.Timeout | null>(null); // Renommé pour clarté
   
   const sortableId = children ? `group-${block.id}` : block.id;
   const { 
@@ -53,35 +58,42 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
     position: 'relative', // Pour positionner le handle
   };
 
-  const handleStyle: React.CSSProperties = {
+  // Styles communs pour les boutons de contrôle à gauche
+  const controlButtonBaseStyle: React.CSSProperties = {
     position: 'absolute',
     top: '0.25rem',
-    left: '-24px', // Ajustez si nécessaire
-    cursor: 'grab',
     padding: '0.25rem',
     transition: 'opacity 0.15s ease-in-out',
-    touchAction: 'none', 
+    opacity: isHovering ? 1 : 0, // Contrôlé par le survol du bloc
+    pointerEvents: isHovering ? 'auto' : 'none', // N'interagir que si visible
+    zIndex: 20, // Au-dessus du contenu
   };
 
-  // Style pour le bouton Supprimer (à côté du handle)
+  const handleStyle: React.CSSProperties = {
+    ...controlButtonBaseStyle,
+    left: '-24px',
+    cursor: 'grab',
+    touchAction: 'none',
+  };
+
   const deleteButtonStyle: React.CSSProperties = {
-    ...handleStyle, // Utiliser la base du style du handle
-    left: '-48px', // Positionner à gauche du handle DND
+    ...controlButtonBaseStyle,
+    left: '-48px',
     cursor: 'pointer', 
   };
 
-  // Classes CSS pour le handle
-  const handleClasses = "dnd-handle absolute text-gray-400 hover:text-gray-600 transition-opacity duration-150 ease-in-out";
-
-  // << MODIFIÉ: Style de base pour la position >>
-  const menuAreaBaseStyle: React.CSSProperties = {
-    position: 'absolute',
-    bottom: '-16px', // Position verticale de référence
-    left: '50%',
-    // Centrage et taille seront gérés par les classes de la zone invisible
-    zIndex: 10, 
-    // L'opacité et pointerEvents sont maintenant sur la zone invisible
+  // << AJOUT: Style pour le bouton Ajouter >>
+  const addButtonStyle: React.CSSProperties = {
+    ...controlButtonBaseStyle,
+    left: '-72px', 
+    cursor: 'pointer',
+    // Style spécifique si le menu radial est ouvert
+    background: isSelectorOpen ? 'rgba(200, 200, 255, 0.2)' : 'transparent',
+    borderRadius: '50%',
   };
+  
+  // Classes CSS pour le handle
+  const handleClasses = "dnd-handle text-gray-400 hover:text-gray-600"; // Simplifié, style dans l'objet
 
   // Déterminer le contenu à rendre à l'intérieur du wrapper
   let contentToRender: React.ReactNode;
@@ -105,45 +117,67 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
     }
   }
 
-  const handleToggleSelector = () => {
-    setIsSelectorOpen(!isSelectorOpen);
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
+  // --- Timer Logic --- 
+  const clearCloseTimer = () => {
+    if (closeMenuTimerRef.current) {
+      clearTimeout(closeMenuTimerRef.current);
+      closeMenuTimerRef.current = null;
     }
   };
-  
-  const handleTypeSelect = (type: string) => {
-    console.log(`[SortableBlockItem] handleTypeSelect: ${type} for block: ${sortableId}`);
-    onAddAfter({ sortableId, selectedType: type });
-    setIsSelectorOpen(false);
+
+  const startCloseTimer = () => {
+    clearCloseTimer(); 
+    closeMenuTimerRef.current = setTimeout(() => {
+      setIsSelectorOpen(false);
+      logger.debug('[SortableBlockItem] Menu closed by timeout');
+    }, 1500); // <<< Changer délai à 1.5 secondes >>>
   };
-  
-  const showMenu = () => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
+
+  // Nettoyer le timer au démontage
+  useEffect(() => {
+    return () => clearCloseTimer();
+  }, []);
+
+  // --- Logique de visibilité des contrôles généraux --- 
+  const showControls = () => {
+    // Ne plus utiliser hideTimeoutRef pour les contrôles généraux
     setIsHovering(true);
   };
-
-  const hideMenuWithDelay = () => {
-    hideTimeoutRef.current = setTimeout(() => {
-      setIsHovering(false);
-      setIsSelectorOpen(false);
-    }, 200);
+  const hideControls = () => {
+    // Cacher immédiatement si pas de menu ouvert
+    if (!isSelectorOpen) {
+        setIsHovering(false);
+    }
+    // Si le menu est ouvert, le timer gérera la fermeture et le masquage
   };
 
-  useEffect(() => {
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
+  // --- Indicateur --- 
+  const showIndicator = () => setShowInsertIndicator(true);
+  const hideIndicator = () => setShowInsertIndicator(false);
+  
+  // --- Logique Menu Radial --- 
+  const handleToggleSelector = () => {
+    const opening = !isSelectorOpen;
+    setIsSelectorOpen(opening);
+    if (opening) {
+      startCloseTimer(); // Démarrer le timer quand on ouvre
+    } else {
+      clearCloseTimer(); // Annuler si on ferme manuellement
+    }
+  };
+
+  const handleTypeSelect = (type: string) => {
+    logger.debug(`[SortableBlockItem] handleTypeSelect: ${type} for block: ${sortableId}`); 
+    onAddAfter({ sortableId, selectedType: type });
+    setIsSelectorOpen(false);
+    clearCloseTimer(); // Annuler le timer lors de la sélection
+  };
 
   const radius = 65;
   const totalItems = blockTypes.length;
-  const angleStep = 360 / totalItems;
+  const startAngle = 115; // Commencer à 135 degrés (3h)
+  const totalAngleRange = 340; // Répartir sur 320 degrés (éviter la droite)
+  const effectiveAngleStep = totalAngleRange / totalItems; 
 
   return (
     <div 
@@ -151,107 +185,107 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
       style={itemStyle} 
       {...attributes} 
       data-dnd-wrapper
-      className={`relative ${block.type === 'thematicBreak' ? 'py-1' : ''}`}
-      onMouseEnter={showMenu}
-      onMouseLeave={hideMenuWithDelay}
+      className={`relative group ${block.type === 'thematicBreak' ? 'py-1' : ''}`}
+      onMouseEnter={showControls} 
+      onMouseLeave={hideControls} // Utiliser hideControls simple
     >
-      {/* Conteneur de Positionnement du Menu */}
-      <div 
-        style={menuAreaBaseStyle} 
-        className="flex items-center justify-center pointer-events-none" // Ne capture pas d'événements ici
-      >
-         {/* << AJOUT: Zone Invisible pour le survol étendu >> */}
-        <div 
-           className={`absolute top-0 left-0 w-44 h-44 rounded-full 
-                      transform -translate-x-1/2 /* Centre sur left:50% du parent */
-                      bg-transparent /* Invisible */
-                      transition-opacity duration-150 ease-in-out
-                      ${isHovering ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`
+      {/* Bouton (+) positionné absolument */}
+      <button
+          style={{
+              position: 'absolute',
+              left: '-72px',
+              top: '0.25rem',
+              zIndex: 25, 
+              opacity: isHovering ? 1 : 0, 
+              pointerEvents: isHovering ? 'auto' : 'none',
+              cursor: 'pointer',
+              padding: '0.25rem', // Padding pour la zone cliquable
+          }}
+          onClick={handleToggleSelector}
+          className={`flex items-center justify-center w-7 h-7 rounded-full 
+                     ${isSelectorOpen 
+                       ? 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-300' 
+                       : 'text-gray-400 hover:text-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'}`
                     }
-           // << MODIFIÉ: Ces handlers maintiennent la visibilité >>
-           onMouseEnter={showMenu} 
-           onMouseLeave={hideMenuWithDelay} 
+          title="Ajouter un bloc après"
+          onMouseEnter={() => { showIndicator(); clearCloseTimer(); }}
+          onMouseLeave={() => { hideIndicator(); startCloseTimer(); }}
         >
-            {/* Le contenu (bouton central, icônes) est positionné PAR RAPPORT à cette zone */} 
+          <Plus size={16} />
+      </button>
 
-            {/* Bouton Central +/-/X (positionné au centre de la zone invisible) */}
-            <button
-              onClick={handleToggleSelector}
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 /* Centrage */
-                         p-1 w-7 h-7 flex items-center justify-center
-                         bg-white dark:bg-gray-700 border rounded-full shadow
-                         hover:bg-gray-100 dark:hover:bg-gray-600
-                         text-blue-500 dark:text-blue-400
-                         focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 
-                         z-20 
-                         transition-transform duration-300 ease-in-out 
-                         ${isSelectorOpen ? 'rotate-45' : 'rotate-0'}`
-                        }
-              title={isSelectorOpen ? "Fermer" : "Ajouter bloc"}
-            >
-              <Plus size={14} />
-            </button>
-
-            {/* Conteneur pour les icônes (items) */}
-            {/* Positionné absolument dans la zone invisible, les items rayonnent depuis le centre */}
-            <div 
-              className="absolute inset-0 w-full h-full" 
-              style={{ pointerEvents: isSelectorOpen ? 'auto' : 'none'}} 
-            >
-              {blockTypes.map(({ type, label, Icon }, index) => {
-                  const angle = angleStep * index;
-                  const itemTransform = isSelectorOpen 
-                      ? `rotate(${angle}deg) translateY(-${radius}px) rotate(-${angle}deg)` 
-                      : 'scale(0)';
-                  const itemStyle: React.CSSProperties = {
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    margin: '-16px 0 0 -16px', // Centre l'item (w-8 h-8)
-                    transform: itemTransform,
-                    transition: `transform 0.3s ease-out, opacity 0.3s ease-out`,
-                    transitionDelay: isSelectorOpen ? `${index * 0.05}s` : '0s',
-                    opacity: isSelectorOpen ? 1 : 0, 
-                  };
-                  return (
-                    <div 
-                      key={type}
-                      onClick={() => handleTypeSelect(type)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full 
-                                 bg-slate-100 dark:bg-slate-700 
-                                 border border-gray-300 dark:border-gray-600 
-                                 text-gray-600 dark:text-gray-300 
-                                 hover:bg-slate-200 dark:hover:bg-slate-600 hover:shadow-md 
-                                 cursor-pointer"
-                      style={itemStyle}
-                      title={label}
-                    >
-                      <Icon size={16} />
-                    </div>
-                  );
-              })}
-            </div>
-        </div>
+      {/* Boutons Handle et Delete */}
+      <button style={deleteButtonStyle} className="text-red-400 hover:text-red-600" onClick={() => onDelete(block.id)} title="Supprimer"> <Trash2 size={16} /> </button>
+      <button ref={setActivatorNodeRef} {...listeners} style={handleStyle} className={handleClasses} title="Déplacer"> <GripVertical size={18} /> </button>
+      
+      {/* === Conteneur du Menu Radial (Positionné absolument, près du bouton +) === */}
+      <div 
+        className="absolute" // Positionné par rapport au wrapper principal
+        style={{ 
+            // Positionner ce conteneur LÀ OÙ LE BOUTON + EST
+            left: '-72px', 
+            top: '0.25rem',
+            // Donner une taille au conteneur pour que les enfants absolus aient une référence
+            width: '32px', // w-8
+            height: '32px', // h-8
+            pointerEvents: isSelectorOpen ? 'auto' : 'none', 
+            zIndex: 30 
+        }}
+      >
+          {blockTypes.map(({ type, label, Icon }, index) => {
+              const angle = startAngle + (effectiveAngleStep * index);
+              const itemTransform = isSelectorOpen 
+                  ? `translateX(-50%) translateY(-50%) rotate(${angle}deg) translateY(-${radius}px) rotate(-${angle}deg)` 
+                  : `translateX(-50%) translateY(-50%) scale(0)`;
+              
+              const itemStyle: React.CSSProperties = {
+                position: 'absolute',
+                // Positionner le coin sup gauche au centre (50%, 50%) du parent (le div ci-dessus)
+                top: '50%', 
+                left: '50%',   
+                width: '32px', 
+                height: '32px', 
+                transformOrigin: 'center center', 
+                transform: itemTransform,
+                transition: `transform 0.3s ease-out, opacity 0.3s ease-out`,
+                transitionDelay: isSelectorOpen ? `${index * 0.05}s` : '0s',
+                opacity: isSelectorOpen ? 1 : 0, 
+              };
+              
+              return (
+                <div 
+                  key={type}
+                  onClick={() => handleTypeSelect(type)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full 
+                           bg-slate-100 dark:bg-slate-700 
+                           border border-gray-300 dark:border-gray-600 
+                           text-gray-600 dark:text-gray-300 
+                           hover:bg-slate-200 dark:hover:bg-slate-600 hover:shadow-md 
+                           cursor-pointer"
+                  style={itemStyle}
+                  title={label}
+                  onMouseEnter={clearCloseTimer}
+                  onMouseLeave={startCloseTimer}
+                >
+                  <Icon size={16} />
+                </div>
+              );
+          })}
       </div>
 
-      <button 
-        ref={setActivatorNodeRef}
-        {...listeners}
-        style={handleStyle} 
-        className={handleClasses} 
-        title="Déplacer le bloc"
-      >
-        <GripVertical size={18} />
-      </button>
-      <button
-        onClick={() => onDelete(block.id)}
-        style={deleteButtonStyle}
-        className="dnd-handle absolute text-red-400 hover:text-red-600 transition-opacity duration-150 ease-in-out"
-        title="Supprimer le bloc"
-      >
-        <Trash2 size={18} />
-      </button>
-      {contentToRender}
+      {/* === Contenu Principal du Bloc === */}
+      <div className="pl-4 pr-4 ml-[-72px]" style={{ paddingLeft: 'calc(72px + 1rem)' }}> 
+        {contentToRender}
+      </div>
+
+      {/* Indicateur d'insertion */}
+      <div 
+        className={`absolute left-0 right-0 bottom-[-1px] h-[2px] bg-blue-500 
+                   transition-opacity duration-150 ease-in-out 
+                   ${showInsertIndicator ? 'opacity-100' : 'opacity-0'}`}
+        style={{ pointerEvents: 'none' }}
+      />
+
     </div>
   );
 };
