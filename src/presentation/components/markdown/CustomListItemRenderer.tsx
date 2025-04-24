@@ -8,8 +8,7 @@ const logger = new PinoLogger();
 interface CustomListItemRendererProps {
   block: ListItemBlock;
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
-  style?: React.CSSProperties;
-  [key: string]: any;
+  listIndex?: number;
 }
 
 const getRawTextFromChildren = (children: InlineElement[] | undefined): string => {
@@ -43,12 +42,9 @@ const buildListPrefix = (block: ListItemBlock): string => {
   return `${indentation}${marker}${checkbox}`;
 };
 
-const CustomListItemRendererComponent = React.forwardRef<
-  HTMLLIElement,
-  CustomListItemRendererProps
->(({ block, style, onUpdateBlockContent, ...rest }, ref) => {
+const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, onUpdateBlockContent, listIndex }) => {
   const { id, content: { children }, metadata } = block;
-  const { checked } = metadata;
+  const { checked, ordered, depth } = metadata;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
@@ -57,14 +53,12 @@ const CustomListItemRendererComponent = React.forwardRef<
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       const rawText = getRawTextFromChildren(children);
-      const prefix = buildListPrefix(block);
-      const fullRawText = prefix + rawText;
-      setEditingText(fullRawText);
-      logger.debug(`[ListItemRenderer] Initializing edit for ${id} with full text:`, fullRawText);
-      textareaRef.current.value = fullRawText;
+      setEditingText(rawText);
+      logger.debug(`[ListItemRenderer] Initializing edit for ${id} with pure text:`, rawText);
+      textareaRef.current.value = rawText;
       textareaRef.current.focus();
     }
-  }, [isEditing, block, children]);
+  }, [isEditing, children, id]);
 
   const handleDoubleClick = () => {
     if (onUpdateBlockContent) {
@@ -81,16 +75,14 @@ const CustomListItemRendererComponent = React.forwardRef<
 
   const handleSave = () => {
     if (!isEditing || !onUpdateBlockContent) return;
-    logger.debug(`[ListItemRenderer] Saving item ${id}. New raw text:`, editingText);
+    logger.debug(`[ListItemRenderer] Saving item ${id}. Pure text:`, editingText);
     onUpdateBlockContent(id, editingText);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    const rawText = getRawTextFromChildren(children);
-    const originalPrefix = buildListPrefix(block);
-    const originalFullRawText = originalPrefix + rawText;
-    setEditingText(originalFullRawText);
+    const originalRawText = getRawTextFromChildren(children);
+    setEditingText(originalRawText);
     setIsEditing(false);
     logger.debug(`[ListItemRenderer] Cancelling edit for item ${id}.`);
   };
@@ -129,64 +121,74 @@ const CustomListItemRendererComponent = React.forwardRef<
 
   if (isEditing) {
     return (
-      <li key={id} ref={ref} style={style} {...rest} className="relative">
+      <div key={id} className="editing-list-item">
         <textarea
           ref={textareaRef}
-          value={editingText} 
+          value={editingText}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onBlur={handleSave} 
           className="block w-full font-sans text-base p-1 border border-blue-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-          rows={editingText.split('\n').length}
+          rows={Math.max(1, editingText.split('\n').length)}
         />
-      </li>
+      </div>
     );
+  }
+
+  let marker = '•';
+  if (ordered) {
+    if (listIndex !== undefined) {
+      if (depth === 0) {
+        marker = `${listIndex + 1}.`;
+      } else if (depth === 1) {
+        marker = `${String.fromCharCode(97 + listIndex)}.`;
+      } else {
+        const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+        marker = `${romanNumerals[listIndex] || listIndex + 1}.`;
+      }
+    } else {
+      marker = '1.';
+    }
   }
 
   const renderedChildren = renderInlineElements(children, block.id);
-  let content;
-  if (checked === true) {
-    content = (
-      <>
-        <input 
-          type="checkbox" 
-          checked 
-          onChange={handleCheckboxChange} 
-          className="mr-2 align-middle cursor-pointer"
-        />
-        <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{renderedChildren}</span>
-      </>
+  let contentWithMarker;
+
+  let checkboxElement: React.ReactNode = null;
+  if (checked === true || checked === false) {
+    checkboxElement = (
+      <input 
+        type="checkbox" 
+        checked={checked} 
+        onChange={handleCheckboxChange}
+        className="mr-2 align-middle cursor-pointer"
+      />
     );
-  } else if (checked === false) {
-    content = (
-      <>
-        <input 
-          type="checkbox" 
-          checked={false}
-          onChange={handleCheckboxChange} 
-          className="mr-2 align-middle cursor-pointer"
-        />
-        {renderedChildren}
-      </>
-    );
-  } else {
-    content = renderedChildren;
   }
 
+  let mainContent = renderedChildren;
+  if (checked === true) {
+    mainContent = <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{renderedChildren}</span>;
+  }
+
+  contentWithMarker = (
+    <div className="flex items-start">
+      {!checkboxElement && <span className="mr-2 list-marker">{marker}</span>}
+      {checkboxElement}
+      <div className="list-item-main-content flex-1">{mainContent}</div>
+    </div>
+  );
+
   return (
-    <li 
-      key={block.id} 
-      ref={ref} 
-      style={style} 
-      {...rest}
+    <div 
+      key={id}
       onDoubleClick={handleDoubleClick}
       title="Double-cliquez pour modifier"
+      className="list-item-content"
     >
-      {content}
-    </li>
+      {contentWithMarker}
+    </div>
   );
-});
+};
 
-CustomListItemRendererComponent.displayName = 'CustomListItemRenderer';
-
-export default CustomListItemRendererComponent; 
+export default CustomListItemRenderer; 

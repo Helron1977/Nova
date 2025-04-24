@@ -100,6 +100,7 @@ export interface ListItemBlock extends BaseBlock {
     depth: number;
     ordered: boolean;
     checked?: boolean | null;
+    markerStyle?: MarkerStyle;
     position?: Position;
   };
 }
@@ -155,6 +156,8 @@ export type Block =
   | TableBlock
   | HTMLBlock;
 
+// << AJOUT: Export du type pour les styles de marqueurs >>
+export type MarkerStyle = 'bullet' | 'decimal' | 'lower-alpha' | 'lower-roman';
 
 // --- Fonction de Parsing ---
 
@@ -279,7 +282,7 @@ export const markdownToBlocks = (markdown: string): Block[] => {
             const listItemBlock: ListItemBlock = {
                 id: uuidv4(),
                 type: 'listItem',
-                content: { children }, // <--- Utilise le résultat de extractInlineContent
+                content: { children }, 
                 metadata: {
                     depth: currentDepth,
                     ordered: listNode.ordered ?? false,

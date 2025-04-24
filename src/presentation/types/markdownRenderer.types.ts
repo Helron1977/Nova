@@ -7,6 +7,7 @@ export type SortableBlockRendererProps = {
   style?: React.CSSProperties; // Styles appliqués par dnd-kit (transform, transition, etc.)
   attributes?: Record<string, any>; // Attributs appliqués par dnd-kit (aria, etc.)
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex?: number; // << AJOUT: Index dans la liste (pour numérotation) >>
 };
 
 // Type définissant un composant React qui:

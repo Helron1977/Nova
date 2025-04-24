@@ -44,10 +44,9 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       const rawText = getRawTextFromChildren(children);
-      const prefixedText = rawText.split('\n').map(line => `> ${line}`).join('\n');
-      setEditingText(prefixedText);
-      logger.debug(`[BlockquoteRenderer] Initializing edit for ${id} with prefixed text:`, prefixedText);
-      textareaRef.current.value = prefixedText;
+      setEditingText(rawText);
+      logger.debug(`[BlockquoteRenderer] Initializing edit for ${id} with pure text:`, rawText);
+      textareaRef.current.value = rawText;
       textareaRef.current.focus();
     }
   }, [isEditing, children, id]);
@@ -67,15 +66,14 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
 
   const handleSave = () => {
     if (!isEditing || !onUpdateBlockContent) return;
-    logger.debug(`[BlockquoteRenderer] Saving quote ${id}. New raw text:`, editingText);
+    logger.debug(`[BlockquoteRenderer] Saving quote ${id}. Pure text:`, editingText);
     onUpdateBlockContent(id, editingText);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    const rawText = getRawTextFromChildren(children);
-    const originalPrefixedText = rawText.split('\n').map(line => `> ${line}`).join('\n');
-    setEditingText(originalPrefixedText);
+    const originalRawText = getRawTextFromChildren(children);
+    setEditingText(originalRawText);
     setIsEditing(false);
     logger.debug(`[BlockquoteRenderer] Cancelling edit for quote ${id}.`);
   };
@@ -107,7 +105,7 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
           className="block w-full font-sans text-base p-1 border border-blue-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-blue-400 dark:focus:border-blue-400 italic"
-          rows={editingText.split('\n').length + 1}
+          rows={Math.max(1, editingText.split('\n').length)}
         />
       ) : (
         renderInlineElements(children, block.id)

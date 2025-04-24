@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Block } from '@/application/logic/markdownParser';
+import type { Block, ListItemBlock } from '@/application/logic/markdownParser';
+import type { MarkerStyle } from '@/application/logic/markdownParser';
 import { markdownComponentsConfig } from '@/presentation/config/markdownComponentsConfig';
-import { GripVertical, Trash2, Plus } from 'lucide-react';
+import { GripVertical, Trash2, Plus, ArrowRightFromLine, CornerDownRight, List, ListOrdered, VenetianMask, ListPlus } from 'lucide-react';
 import { Pilcrow, Heading1, Heading2, SquareCode, GitGraph, Image, Quote, Table, Codepen, Minus } from 'lucide-react';
 
 // << AJOUT: Importer le logger >>
@@ -12,15 +13,15 @@ const logger = new PinoLogger();
 
 interface SortableBlockItemProps {
   block: Block;
-  children?: React.ReactNode; // Peut être des enfants directs (ListGroup) ou rien
   onDelete: (id: string) => void;
-  onAddAfter: (data: { sortableId: string; selectedType: string }) => void;
+  onAddAfter: (data: { sortableId: string; selectedType: string; markerStyle?: MarkerStyle }) => void;
   onUpdateBlockContent: (blockId: string, newText: string) => void;
   index: number;
+  listIndex?: number;
 }
 
-// << AJOUT: Définition des types pour le sélecteur local >>
-const blockTypes = [
+// Types standard
+const standardBlockTypes = [
   { type: 'paragraph', label: 'Paragraphe', Icon: Pilcrow },
   { type: 'heading1', label: 'Titre 1', Icon: Heading1 },
   { type: 'heading2', label: 'Titre 2', Icon: Heading2 },
@@ -33,13 +34,35 @@ const blockTypes = [
   { type: 'thematicBreak', label: 'Ligne', Icon: Minus },
 ];
 
-export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, children, onDelete, onAddAfter, onUpdateBlockContent }) => {
+// Actions spécifiques aux listes
+const listItemMenuActions = [
+  { type: 'addListItemSibling', label: 'Ajouter élément', Icon: ArrowRightFromLine },
+  { type: 'addListItemChild', label: 'Créer une sous liste', Icon: CornerDownRight },
+];
+
+// Type unifié pour les actions du menu
+type MenuItemAction = {
+    type: string;
+    label: string;
+    Icon: React.ElementType;
+};
+
+// << AJOUT: Définition des styles de marqueurs pour le sous-menu >>
+const markerStyleOptions: { style: MarkerStyle; label: string; Icon: React.ElementType }[] = [
+  { style: 'bullet', label: 'Puce (•)', Icon: List },
+  { style: 'decimal', label: 'Numéro (1.)', Icon: ListOrdered },
+  { style: 'lower-alpha', label: 'Lettre (a.)', Icon: ListPlus }, // Utiliser ListPlus en attendant mieux
+  { style: 'lower-roman', label: 'Romain (i.)', Icon: VenetianMask }, // Utiliser VenetianMask en attendant mieux
+];
+
+export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onDelete, onAddAfter, onUpdateBlockContent, listIndex }) => {
   const [isHovering, setIsHovering] = useState(false);
-  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [isPrimarySelectorOpen, setIsPrimarySelectorOpen] = useState(false);
+  const [isMarkerSelectorOpen, setIsMarkerSelectorOpen] = useState(false);
   const [showInsertIndicator, setShowInsertIndicator] = useState(false);
-  const closeMenuTimerRef = useRef<NodeJS.Timeout | null>(null); // Renommé pour clarté
+  const closeMenuTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  const sortableId = children ? `group-${block.id}` : block.id;
+  const sortableId = block.id;
   const { 
     attributes, 
     listeners, 
@@ -56,7 +79,7 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
-    position: 'relative', // Pour positionner le handle
+    position: 'relative',
   };
 
   // Styles communs pour les boutons de contrôle à gauche
@@ -89,40 +112,46 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
     left: '-72px', 
     cursor: 'pointer',
     // Style spécifique si le menu radial est ouvert
-    background: isSelectorOpen ? 'rgba(200, 200, 255, 0.2)' : 'transparent',
+    background: isPrimarySelectorOpen ? 'rgba(200, 200, 255, 0.2)' : 'transparent',
     borderRadius: '50%',
   };
   
   // Classes CSS pour le handle
   const handleClasses = "dnd-handle text-gray-400 hover:text-gray-600"; // Simplifié, style dans l'objet
 
-  // Déterminer le contenu à rendre à l'intérieur du wrapper
-  let contentToRender: React.ReactNode;
-  if (children) {
-    // Cas 1: Des enfants sont fournis (ListGroupRenderer)
-    if (React.isValidElement(children)) {
-      contentToRender = React.cloneElement(children as React.ReactElement<any>, {
-        onUpdateBlockContent: onUpdateBlockContent 
-      });
-      logger.debug(`[SortableBlockItem] Cloning children (ListGroup) and passing onUpdateBlockContent for group ${sortableId}`);
+  // << MODIFIÉ: Déterminer les actions du menu dynamiquement >>
+  const primaryMenuActions: MenuItemAction[] = useMemo(() => {
+    const isListContext = block.type === 'listItem';
+    logger.debug(`[SortableBlockItem ${block.id}] Determining menu actions. Block type: ${block.type}. Is list context: ${isListContext}`);
+    
+    if (isListContext) {
+      const filteredStandard = standardBlockTypes.filter(
+        typeInfo => !['heading1', 'heading2', 'thematicBreak'].includes(typeInfo.type)
+      );
+      const actions = [...filteredStandard, ...listItemMenuActions];
+      logger.debug(`[SortableBlockItem ${block.id}] List context menu actions:`, actions.map(a => a.type));
+      return actions;
     } else {
-      logger.error("[SortableBlockItem] Children exist but are not a valid React element.", children);
-      contentToRender = children;
+      logger.debug(`[SortableBlockItem ${block.id}] Standard menu actions.`);
+      return standardBlockTypes;
     }
+  }, [block.type]);
+
+  // << SIMPLIFIÉ: Rendu direct du composant de bloc >>
+  const BlockComponent = markdownComponentsConfig[block.type as keyof typeof markdownComponentsConfig];
+  let contentToRender: React.ReactNode;
+  if (BlockComponent) {
+      contentToRender = <BlockComponent 
+                          block={block} 
+                          onUpdateBlockContent={onUpdateBlockContent} 
+                          listIndex={listIndex}
+                        />;
   } else {
-    // Cas 2: Pas d'enfants, utiliser BlockComponent
-    const BlockComponent = markdownComponentsConfig[block.type as keyof typeof markdownComponentsConfig];
-    if (BlockComponent) {
-      // Cas 2b: Bloc standard connu
-      contentToRender = <BlockComponent block={block} onUpdateBlockContent={onUpdateBlockContent} />;
-    } else {
-      // Cas 2a: Type de bloc inconnu
       contentToRender = (
         <div className="border border-dashed border-red-500 p-2 my-1">
           Type de bloc inconnu: {block.type}
         </div>
       );
-    }
   }
 
   // --- Timer Logic --- 
@@ -136,8 +165,9 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
   const startCloseTimer = () => {
     clearCloseTimer(); 
     closeMenuTimerRef.current = setTimeout(() => {
-      setIsSelectorOpen(false);
-      logger.debug('[SortableBlockItem] Menu closed by timeout');
+      setIsPrimarySelectorOpen(false);
+      setIsMarkerSelectorOpen(false);
+      logger.debug('[SortableBlockItem] Menus closed by timeout');
     }, 1500); // <<< Changer délai à 1.5 secondes >>>
   };
 
@@ -153,7 +183,7 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
   };
   const hideControls = () => {
     // Cacher immédiatement si pas de menu ouvert
-    if (!isSelectorOpen) {
+    if (!isPrimarySelectorOpen && !isMarkerSelectorOpen) {
         setIsHovering(false);
     }
     // Si le menu est ouvert, le timer gérera la fermeture et le masquage
@@ -164,9 +194,10 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
   const hideIndicator = () => setShowInsertIndicator(false);
   
   // --- Logique Menu Radial --- 
-  const handleToggleSelector = () => {
-    const opening = !isSelectorOpen;
-    setIsSelectorOpen(opening);
+  const handleTogglePrimarySelector = () => {
+    const opening = !isPrimarySelectorOpen;
+    setIsPrimarySelectorOpen(opening);
+    setIsMarkerSelectorOpen(false);
     if (opening) {
       startCloseTimer(); // Démarrer le timer quand on ouvre
     } else {
@@ -174,18 +205,55 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
     }
   };
 
-  const handleTypeSelect = (type: string) => {
-    logger.debug(`[SortableBlockItem] handleTypeSelect: ${type} for block: ${sortableId}`); 
-    onAddAfter({ sortableId, selectedType: type });
-    setIsSelectorOpen(false);
-    clearCloseTimer(); // Annuler le timer lors de la sélection
+  const handlePrimaryActionSelect = (type: string) => {
+    logger.debug(`[SortableBlockItem] Primary action selected: ${type} for block: ${sortableId}`); 
+    
+    if (type === 'addListItemChild') {
+      setIsMarkerSelectorOpen(true);
+      setIsPrimarySelectorOpen(false);
+      startCloseTimer();
+    } else {
+      onAddAfter({ sortableId: sortableId, selectedType: type });
+      setIsPrimarySelectorOpen(false);
+      clearCloseTimer();
+    }
   };
 
-  const radius = 65;
-  const totalItems = blockTypes.length;
-  const startAngle = 115; // Commencer à 135 degrés (3h)
-  const totalAngleRange = 340; // Répartir sur 320 degrés (éviter la droite)
-  const effectiveAngleStep = totalAngleRange / totalItems; 
+  const handleMarkerStyleSelect = (markerStyle: MarkerStyle) => {
+    logger.debug(`[SortableBlockItem] Marker style selected: ${markerStyle} for adding child to block: ${sortableId}`);
+    onAddAfter({
+      sortableId: sortableId,
+      selectedType: 'addListItemChild',
+      markerStyle: markerStyle
+    });
+    setIsMarkerSelectorOpen(false);
+    clearCloseTimer();
+  };
+
+  // << MODIFIÉ: Calculs basés sur menuActions dynamiques >>
+  const primaryRadius = 65;
+  const totalPrimaryItems = primaryMenuActions.length;
+  const primaryStartAngle = 115; 
+  const primaryTotalAngleRange = 340; 
+  const primaryEffectiveAngleStep = totalPrimaryItems > 1 ? primaryTotalAngleRange / totalPrimaryItems : 0; 
+
+  // << AJOUT: Calcul du padding pour l'indentation >>
+  let contentPaddingLeft = 'calc(72px + 1rem)'; // Padding de base pour laisser place aux contrôles
+  if (block.type === 'listItem') {
+      const depth = (block as ListItemBlock).metadata.depth || 0;
+      // Ajouter 1.5rem par niveau d'indentation (ajustable)
+      contentPaddingLeft = `calc(72px + 1rem + ${depth * 1.5}rem)`; 
+      logger.debug(`[SortableBlockItem ${block.id}] ListItem detected. Depth: ${depth}. Setting paddingLeft to ${contentPaddingLeft}`);
+  }
+
+  // << AJOUT: Calculs pour le sous-menu de marqueurs (position fixe ?) >>
+  // On pourrait le faire radial aussi, mais peut-être plus simple linéaire ?
+  // Pour l'instant, faisons-le radial aussi, plus petit.
+  const markerRadius = 45;
+  const totalMarkerItems = markerStyleOptions.length;
+  const markerStartAngle = 90; // Commencer en haut
+  const markerTotalAngleRange = 180; // Sur un demi-cercle ?
+  const markerEffectiveAngleStep = totalMarkerItems > 1 ? markerTotalAngleRange / (totalMarkerItems - 1) : 0;
 
   return (
     <div 
@@ -195,7 +263,7 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
       data-dnd-wrapper
       className={`relative group ${block.type === 'thematicBreak' ? 'py-1' : ''}`}
       onMouseEnter={showControls} 
-      onMouseLeave={hideControls} // Utiliser hideControls simple
+      onMouseLeave={hideControls}
     >
       {/* Bouton (+) positionné absolument */}
       <button
@@ -209,9 +277,9 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
               cursor: 'pointer',
               padding: '0.25rem', // Padding pour la zone cliquable
           }}
-          onClick={handleToggleSelector}
+          onClick={handleTogglePrimarySelector}
           className={`flex items-center justify-center w-7 h-7 rounded-full 
-                     ${isSelectorOpen 
+                     ${isPrimarySelectorOpen 
                        ? 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-300' 
                        : 'text-gray-400 hover:text-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'}`
                     }
@@ -226,26 +294,20 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
       <button style={deleteButtonStyle} className="text-red-400 hover:text-red-600" onClick={() => onDelete(block.id)} title="Supprimer"> <Trash2 size={16} /> </button>
       <button ref={setActivatorNodeRef} {...listeners} style={handleStyle} className={handleClasses} title="Déplacer"> <GripVertical size={18} /> </button>
       
-      {/* === Conteneur du Menu Radial (Positionné absolument, près du bouton +) === */}
+      {/* === Conteneur pour les DEUX Menus Radiaux === */} 
       <div 
-        className="absolute" // Positionné par rapport au wrapper principal
+        className="absolute" 
         style={{ 
-            // Positionner ce conteneur LÀ OÙ LE BOUTON + EST
-            left: '-72px', 
-            top: '0.25rem',
-            // Donner une taille au conteneur pour que les enfants absolus aient une référence
-            width: '32px', // w-8
-            height: '32px', // h-8
-            pointerEvents: isSelectorOpen ? 'auto' : 'none', 
+            left: '-72px', top: '0.25rem',
+            width: '32px', height: '32px',
+            pointerEvents: isPrimarySelectorOpen || isMarkerSelectorOpen ? 'auto' : 'none', // Actif si l'un ou l'autre est ouvert
             zIndex: 30 
         }}
       >
-          {blockTypes.map(({ type, label, Icon }, index) => {
-              const angle = startAngle + (effectiveAngleStep * index);
-              const itemTransform = isSelectorOpen 
-                  ? `translateX(-50%) translateY(-50%) rotate(${angle}deg) translateY(-${radius}px) rotate(-${angle}deg)` 
-                  : `translateX(-50%) translateY(-50%) scale(0)`;
-              
+          {/* --- Menu Radial PRINCIPAL --- */} 
+          {isPrimarySelectorOpen && primaryMenuActions.map(({ type, label, Icon }, index) => {
+              const angle = primaryStartAngle + (primaryEffectiveAngleStep * index);
+              const itemTransform = `translateX(-50%) translateY(-50%) rotate(${angle}deg) translateY(-${primaryRadius}px) rotate(-${angle}deg)`;
               const itemStyle: React.CSSProperties = {
                 position: 'absolute',
                 // Positionner le coin sup gauche au centre (50%, 50%) du parent (le div ci-dessus)
@@ -256,14 +318,14 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
                 transformOrigin: 'center center', 
                 transform: itemTransform,
                 transition: `transform 0.3s ease-out, opacity 0.3s ease-out`,
-                transitionDelay: isSelectorOpen ? `${index * 0.05}s` : '0s',
-                opacity: isSelectorOpen ? 1 : 0, 
+                transitionDelay: isPrimarySelectorOpen ? `${index * 0.05}s` : '0s',
+                opacity: isPrimarySelectorOpen ? 1 : 0, 
               };
               
               return (
                 <div 
                   key={type}
-                  onClick={() => handleTypeSelect(type)}
+                  onClick={() => handlePrimaryActionSelect(type)}
                   className="w-8 h-8 flex items-center justify-center rounded-full 
                            bg-slate-100 dark:bg-slate-700 
                            border border-gray-300 dark:border-gray-600 
@@ -279,10 +341,41 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
                 </div>
               );
           })}
+          
+          {/* --- SOUS-Menu Radial pour MARQUEURS --- */} 
+          {isMarkerSelectorOpen && markerStyleOptions.map(({ style, label, Icon }, index) => {
+              const angle = markerStartAngle + (markerEffectiveAngleStep * index);
+              const itemTransform = `translateX(-50%) translateY(-50%) rotate(${angle}deg) translateY(-${markerRadius}px) rotate(-${angle}deg)`;
+              const itemStyle: React.CSSProperties = {
+                 position: 'absolute', top: '50%', left: '50%', width: '32px', height: '32px', 
+                 transformOrigin: 'center center', transform: itemTransform,
+                 transition: `transform 0.2s ease-out, opacity 0.2s ease-out`,
+                 opacity: 1, // Toujours visible quand isMarkerSelectorOpen est true
+              };
+              
+              return (
+                <div 
+                  key={style}
+                  onClick={() => handleMarkerStyleSelect(style)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full 
+                             bg-emerald-100 dark:bg-emerald-800
+                             border border-emerald-300 dark:border-emerald-600 
+                             text-emerald-700 dark:text-emerald-200 
+                             hover:bg-emerald-200 dark:hover:bg-emerald-700 hover:shadow-md 
+                             cursor-pointer"
+                  style={itemStyle}
+                  title={label}
+                  onMouseEnter={clearCloseTimer}
+                  onMouseLeave={startCloseTimer}
+                >
+                  <Icon size={16} />
+                </div>
+              );
+          })}
       </div>
 
       {/* === Contenu Principal du Bloc === */}
-      <div className="pl-4 pr-4 ml-[-72px]" style={{ paddingLeft: 'calc(72px + 1rem)' }}> 
+      <div className="pr-4" style={{ paddingLeft: contentPaddingLeft }}> 
         {contentToRender}
       </div>
 

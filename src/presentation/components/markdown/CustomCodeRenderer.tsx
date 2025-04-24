@@ -13,30 +13,27 @@ interface CustomCodeRendererProps {
 
 const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ block, onUpdateBlockContent, ...rest }) => {
   const { id } = block;
-  const { code } = block.content;
-  const language = block.type === 'code' ? block.content.language : 'mermaid';
+  const code = block.content?.code || '';
+  const language = block.type === 'code' ? block.content?.language : 'mermaid';
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (block.type === 'code' && isEditing && textareaRef.current) {
-      const lang = block.content.language || '';
-      const rawText = `\`\`\`${lang}\n${block.content.code}\n\`\`\``;
-      setEditingText(rawText);
-      logger.debug(`[CustomCodeRenderer] Initializing edit for code block ${id} with raw text:`, rawText);
-      textareaRef.current.value = rawText;
+    if (block.type === 'code' && isEditing && textareaRef.current && typeof block.content?.code === 'string') {
+      const pureCode = block.content.code;
+      setEditingText(pureCode);
+      logger.debug(`[CustomCodeRenderer] Initializing edit for code block ${id} with pure code:`, pureCode);
+      textareaRef.current.value = pureCode;
       textareaRef.current.focus();
     }
   }, [isEditing, block]);
 
   const handleDoubleClick = () => {
-    if (block.type === 'code' && onUpdateBlockContent) {
+    if (block.type === 'code') {
       logger.debug(`[CustomCodeRenderer] Double click on code block ${id}. Entering edit mode.`);
       setIsEditing(true);
-    } else if (block.type === 'code') {
-      logger.warn(`[CustomCodeRenderer] Double click on code block ${id} but onUpdateBlockContent is missing.`);
     }
   };
 
@@ -46,16 +43,15 @@ const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ block, onUpdate
 
   const handleSave = () => {
     if (!isEditing || block.type !== 'code' || !onUpdateBlockContent) return;
-    logger.debug(`[CustomCodeRenderer] Saving code block ${id}. New raw text:`, editingText);
+    logger.debug(`[CustomCodeRenderer] Saving code block ${id}. Pure code:`, editingText);
     onUpdateBlockContent(id, editingText);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    if (block.type !== 'code') return;
-    const lang = block.content.language || '';
-    const originalRawText = `\`\`\`${lang}\n${block.content.code}\n\`\`\``;
-    setEditingText(originalRawText);
+    if (block.type !== 'code' || typeof block.content?.code !== 'string') return;
+    const originalPureCode = block.content.code;
+    setEditingText(originalPureCode);
     setIsEditing(false);
     logger.debug(`[CustomCodeRenderer] Cancelling edit for code block ${id}.`);
   };
@@ -71,7 +67,7 @@ const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ block, onUpdate
   };
 
   if (block.type === 'mermaid') {
-    return <MermaidDiagram code={code} {...rest} />;
+    return <MermaidDiagram code={typeof code === 'string' ? code : ''} {...rest} />;
   }
 
   const className = language ? `language-${language}` : undefined;
@@ -86,10 +82,10 @@ const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ block, onUpdate
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
           className="block w-full font-mono text-sm p-2 border border-blue-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-          rows={editingText.split('\n').length + 1}
+          rows={Math.max(3, editingText.split('\n').length)}
         />
       ) : (
-        <code className={className}>{code}</code>
+        <code className={className}>{typeof code === 'string' ? code : ''}</code>
       )}
     </pre>
   );

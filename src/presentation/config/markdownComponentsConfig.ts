@@ -8,7 +8,6 @@ import CustomBlockquoteRenderer from '../components/markdown/CustomBlockquoteRen
 import CustomThematicBreakRenderer from '../components/markdown/CustomThematicBreakRenderer';
 import CustomTableRenderer from '../components/markdown/CustomTableRenderer';
 import CustomHTMLRenderer from '../components/markdown/CustomHTMLRenderer';
-import CustomListWrapper from '../components/markdown/CustomListWrapper';
 import CustomMermaidRenderer from '../components/markdown/CustomMermaidRenderer';
 // Le ListWrapper n'est pas directement mappé ici, il sera utilisé par le renderer principal
 

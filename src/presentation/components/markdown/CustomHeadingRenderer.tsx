@@ -10,34 +10,33 @@ const logger = new PinoLogger();
 interface CustomHeadingRendererProps {
   block: HeadingBlock;
   onUpdateBlockContent: (blockId: string, newText: string) => void;
-  style?: React.CSSProperties;
-  // Permettre props arbitraires via [key: string]: any
-  [key: string]: any;
+  // Retirer style et rest car non utilisés ici
+  // style?: React.CSSProperties;
+  // [key: string]: any;
 }
 
-// Fonction récursive pour extraire le texte brut
-const getRawTextFromChildren = (children: InlineElement[]): string => {
+// Fonction récursive pour extraire le texte brut (devrait être externalisée)
+const getRawTextFromChildren = (children: InlineElement[] | undefined): string => {
+  if (!Array.isArray(children)) return '';
   return children.map(child => {
-    switch (child.type) {
+    switch (child?.type) {
       case 'text':
       case 'inlineCode':
-      case 'html': // Considérer le HTML comme du texte pour l'édition brute
-        return (child as TextInline).value || ''; // Accès sûr à value
+      case 'html':
+        return (child as TextInline).value || '';
       case 'strong':
       case 'emphasis':
       case 'delete':
-      case 'link': // Pour les liens, extraire le texte des enfants
-        // Assurer que child.children existe et est un tableau avant récursion
+      case 'link':
         return child.children ? getRawTextFromChildren(child.children) : '';
       default:
-        // Ignorer les autres types ou logger un avertissement si nécessaire
-        // logger.warn(`[getRawTextFromChildren] Unhandled inline type: ${child.type}`);
         return '';
     }
   }).join('');
 };
 
-const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, onUpdateBlockContent, style, ...rest }) => {
+// << MODIFIÉ: Implémentation de l'édition "texte pur" >>
+const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, onUpdateBlockContent }) => {
   const { id, content: { level, children } } = block;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -46,16 +45,16 @@ const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, on
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
+      // Initialiser avec le texte pur SANS préfixe
       const rawText = getRawTextFromChildren(children);
-      const prefix = '#'.repeat(level) + ' ';
-      const fullRawText = prefix + rawText;
-      setEditingText(fullRawText);
-      logger.debug(`[CustomHeadingRenderer] Initializing edit for ${id} with raw text: "${fullRawText}"`);
-      inputRef.current.value = fullRawText;
+      setEditingText(rawText);
+      logger.debug(`[CustomHeadingRenderer] Initializing edit for ${id} with pure text: "${rawText}"`);
+      inputRef.current.value = rawText; // Assigner la valeur pure
+      inputRef.current.focus();
       inputRef.current.select();
     }
-  }, [isEditing, children, level, id]);
+    // Retirer `level` des dépendances car il n'affecte plus l'init
+  }, [isEditing, children, id]); 
 
   const handleDoubleClick = () => {
     logger.debug(`[CustomHeadingRenderer] Double click on heading ${id}. Entering edit mode.`);
@@ -67,9 +66,9 @@ const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, on
   };
 
   const handleSave = () => {
-    if (!isEditing) return;
-    logger.debug(`[CustomHeadingRenderer] Saving heading ${id}. New raw text: "${editingText}"`);
-    onUpdateBlockContent(id, editingText);
+    if (!isEditing || !onUpdateBlockContent) return; 
+    logger.debug(`[CustomHeadingRenderer] Saving heading ${id}. Pure text: "${editingText}"`);
+    onUpdateBlockContent(id, editingText); 
     setIsEditing(false);
   };
 
@@ -77,16 +76,18 @@ const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, on
     if (event.key === 'Enter') {
       logger.debug("[CustomHeadingRenderer] Enter key pressed, saving.");
       handleSave();
-      event.preventDefault();
+      event.preventDefault(); 
     } else if (event.key === 'Escape') {
       logger.debug("[CustomHeadingRenderer] Escape key pressed, cancelling edit.");
-      const originalRawText = '#'.repeat(level) + ' ' + getRawTextFromChildren(children);
-      setEditingText(originalRawText);
+      // Restaurer le texte pur SANS préfixe
+      const originalRawText = getRawTextFromChildren(children);
+      setEditingText(originalRawText); 
       setIsEditing(false);
       event.preventDefault();
     }
   };
 
+  // Contenu pour l'affichage (non-édition)
   const markdownContent = getRawTextFromChildren(children);
 
   return (
@@ -95,17 +96,17 @@ const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, on
         <input
           ref={inputRef}
           type="text"
-          defaultValue={editingText}
+          value={editingText} // Utiliser `value` contrôlée
           onChange={handleChange}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
+          onBlur={handleSave} 
+          onKeyDown={handleKeyDown} 
           className={`w-full px-1 py-0.5 rounded border border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-500 \
-                     font-sans text-base // Styles pour ressembler au rendu normal autant que possible
+                     font-sans text-base 
                      ${level === 1 ? 'text-3xl font-bold' : ''} \
                      ${level === 2 ? 'text-2xl font-semibold' : ''} \
                      ${level === 3 ? 'text-xl font-medium' : ''} \
                      ${level >= 4 ? 'text-lg font-normal' : ''} \
-                     `} // Appliquer les styles de base + heading
+                     `} 
           style={{ 
               fontSize: level === 1 ? '1.875rem' : level === 2 ? '1.5rem' : level === 3 ? '1.25rem' : '1.125rem',
               fontWeight: level === 1 ? '700' : level === 2 ? '600' : level === 3 ? '500' : '400',
