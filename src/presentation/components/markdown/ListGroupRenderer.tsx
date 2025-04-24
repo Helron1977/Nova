@@ -16,7 +16,12 @@ type ListNestingNode = {
 };
 
 // Fonction pour rendre récursivement la structure de liste imbriquée
-const renderNestedList = (node: ListNestingNode | ListItemBlock, index: number, parentKey: string): React.JSX.Element => {
+const renderNestedList = (
+  node: ListNestingNode | ListItemBlock, 
+  index: number, 
+  parentKey: string, 
+  onUpdateBlockContent?: (blockId: string, newText: string) => void
+): React.JSX.Element => {
   logger.debug(`[RenderList] Rendering node at index ${index}, parentKey: ${parentKey}, type: ${('type' in node) ? node.type : node.tag}`);
 
   if ('type' in node && node.type === 'listItem') {
@@ -29,7 +34,11 @@ const renderNestedList = (node: ListNestingNode | ListItemBlock, index: number, 
     // Note : Ce BlockComponent (CustomListItemRenderer) applique déjà ref, style, attrs
     // mais ici, nous ne lui passons pas ces props DND car ce contexte n'est pas triable.
     // Il recevra seulement la prop 'block'.
-    return <BlockComponent key={node.id} block={node} />;
+    return <BlockComponent 
+             key={node.id} 
+             block={node} 
+             onUpdateBlockContent={onUpdateBlockContent}
+           />;
     
   } else if ('tag' in node) {
     const currentListKey = `${parentKey}-child-${index}`;
@@ -37,7 +46,7 @@ const renderNestedList = (node: ListNestingNode | ListItemBlock, index: number, 
     return (
       <CustomListWrapper key={currentListKey} ordered={node.tag === 'ol'}>
         {node.children.map((child: ListItemBlock | ListNestingNode, childIndex: number) => 
-          renderNestedList(child, childIndex, currentListKey) 
+          renderNestedList(child, childIndex, currentListKey, onUpdateBlockContent) 
         )}
       </CustomListWrapper>
     );
@@ -99,16 +108,17 @@ const buildListTree = (listItems: ListItemBlock[]): ListNestingNode | null => {
 
 interface ListGroupRendererProps {
   listItems: ListItemBlock[];
+  onUpdateBlockContent?: (blockId: string, newText: string) => void;
 }
 
-const ListGroupRenderer: React.FC<ListGroupRendererProps> = ({ listItems }) => {
+const ListGroupRenderer: React.FC<ListGroupRendererProps> = ({ listItems, onUpdateBlockContent }) => {
   logger.debug('[ListGroupRenderer] Rendering group with items:', listItems);
   const listTree = buildListTree(listItems);
 
   if (listTree) {
     // Utiliser l'ID du premier item pour la clé racine
     const rootListKey = `${listItems[0]?.id || 'list'}-listroot`; 
-    return renderNestedList(listTree, 0, rootListKey);
+    return renderNestedList(listTree, 0, rootListKey, onUpdateBlockContent);
   } else {
     logger.warn('[ListGroupRenderer] buildListTree returned null for group:', listItems);
     return null; // Ne rien rendre si l'arbre n'a pas pu être construit

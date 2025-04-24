@@ -51,8 +51,8 @@ const Header: React.FC = () => {
       {/* Logo et Titre */}
       <div className="flex items-center font-bold text-lg tracking-wide">
         {/* Utiliser le nouveau logo SVG et l'agrandir */} 
-        <img src="/nova.svg" alt="Logo Nova" height="48" className="h-12 mr-2" />
-        <span>NOVA</span>
+        <img src="/nova.png" alt="Logo Nova" height="48" className="h-12 mr-2" />
+        <span className="text-xl font-semibold text-gray-800 dark:text-gray-200">Nova</span>
       </div>
 
       {/* Actions Header */}

@@ -149,6 +149,62 @@ function App() {
     );
   }
 
+  // << MODIFIÉ: Logique d'édition avec parsing local >>
+  const handleBlockContentChange = useCallback((blockId: string, newRawText: string) => {
+    logger.debug(`[App] handleBlockContentChange called for block ID: ${blockId}`);
+    
+    setBlocks(currentBlocks => {
+      const editedBlockIndex = currentBlocks.findIndex(b => b.id === blockId);
+      
+      if (editedBlockIndex === -1) {
+        logger.error(`[App] Block with ID ${blockId} not found for update.`);
+        return currentBlocks; // Retourne les blocs inchangés si non trouvé
+      }
+
+      logger.debug(`[App] Found block at index ${editedBlockIndex}. Parsing new text:`, newRawText);
+
+      try {
+        // Parser UNIQUEMENT le nouveau texte
+        let parsedNewBlocks = markdownToBlocks(newRawText);
+        logger.debug(`[App] Parsed new text into ${parsedNewBlocks.length} block(s):`, parsedNewBlocks);
+
+        // Si le parsing ne retourne rien (texte vide ou invalide?), 
+        // on peut choisir de supprimer le bloc ou de le laisser vide (ex: paragraphe vide)
+        // Pour l'instant, créons un paragraphe vide si rien n'est retourné.
+        if (parsedNewBlocks.length === 0) {
+           logger.warn("[App] Parsing new text resulted in zero blocks. Creating an empty paragraph.");
+           parsedNewBlocks = [{
+               id: uuidv4(), // Nouvel ID même pour le vide
+               type: 'paragraph',
+               content: { children: [{ type: 'text', value: '' }] }
+           }];
+        } else {
+          // Assigner de nouveaux IDs uniques aux blocs parsés
+          parsedNewBlocks = parsedNewBlocks.map(block => ({
+            ...block,
+            id: uuidv4()
+          }));
+           logger.debug("[App] Assigned new IDs to parsed blocks:", parsedNewBlocks);
+        }
+
+        // Construire le nouveau tableau de blocs
+        const updatedBlocks = [
+          ...currentBlocks.slice(0, editedBlockIndex),
+          ...parsedNewBlocks, // Insérer le(s) nouveau(x) bloc(s)
+          ...currentBlocks.slice(editedBlockIndex + 1)
+        ];
+
+        logger.debug("[App] Final updated blocks array prepared:", updatedBlocks);
+        return updatedBlocks;
+
+      } catch (error) {
+        logger.error("[App] Error parsing new block content:", { error, blockId, newRawText });
+        return currentBlocks; // En cas d'erreur de parsing, ne rien changer
+      }
+    });
+
+  }, []); // Pas de dépendances externes car setBlocks gère la clôture
+
   // << MODIFIÉ: Gère l'ajout complet sur sélection du type >>
   const handleAddBlockAfter = useCallback((data: { sortableId: string; selectedType: string }) => {
     const { sortableId, selectedType } = data;
@@ -286,6 +342,7 @@ function App() {
                 // Ne pas passer sortableIds ici
                 onDeleteBlock={handleDeleteBlock} 
                 onAddBlockAfter={handleAddBlockAfter}
+                onUpdateBlockContent={handleBlockContentChange}
               />
             </div>
           </SortableContext>

@@ -15,6 +15,7 @@ interface SortableBlockItemProps {
   children?: React.ReactNode; // Peut être des enfants directs (ListGroup) ou rien
   onDelete: (id: string) => void;
   onAddAfter: (data: { sortableId: string; selectedType: string }) => void;
+  onUpdateBlockContent: (blockId: string, newText: string) => void;
   index: number;
 }
 
@@ -32,7 +33,7 @@ const blockTypes = [
   { type: 'thematicBreak', label: 'Ligne', Icon: Minus },
 ];
 
-export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, children, onDelete, onAddAfter}) => {
+export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, children, onDelete, onAddAfter, onUpdateBlockContent }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [showInsertIndicator, setShowInsertIndicator] = useState(false);
@@ -98,15 +99,22 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, chi
   // Déterminer le contenu à rendre à l'intérieur du wrapper
   let contentToRender: React.ReactNode;
   if (children) {
-    // Cas 1: Des enfants sont fournis (ex: ListGroupRenderer)
-    contentToRender = children;
+    // Cas 1: Des enfants sont fournis (ListGroupRenderer)
+    if (React.isValidElement(children)) {
+      contentToRender = React.cloneElement(children as React.ReactElement<any>, {
+        onUpdateBlockContent: onUpdateBlockContent 
+      });
+      logger.debug(`[SortableBlockItem] Cloning children (ListGroup) and passing onUpdateBlockContent for group ${sortableId}`);
+    } else {
+      logger.error("[SortableBlockItem] Children exist but are not a valid React element.", children);
+      contentToRender = children;
+    }
   } else {
     // Cas 2: Pas d'enfants, utiliser BlockComponent
     const BlockComponent = markdownComponentsConfig[block.type as keyof typeof markdownComponentsConfig];
     if (BlockComponent) {
       // Cas 2b: Bloc standard connu
-      // Le BlockComponent NE reçoit PLUS les props DND directement
-      contentToRender = <BlockComponent block={block} />;
+      contentToRender = <BlockComponent block={block} onUpdateBlockContent={onUpdateBlockContent} />;
     } else {
       // Cas 2a: Type de bloc inconnu
       contentToRender = (

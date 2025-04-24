@@ -6,6 +6,7 @@ export type SortableBlockRendererProps = {
   block: Block; // Le bloc de données Markdown
   style?: React.CSSProperties; // Styles appliqués par dnd-kit (transform, transition, etc.)
   attributes?: Record<string, any>; // Attributs appliqués par dnd-kit (aria, etc.)
+  onUpdateBlockContent?: (blockId: string, newText: string) => void;
 };
 
 // Type définissant un composant React qui:

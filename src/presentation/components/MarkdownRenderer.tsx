@@ -11,12 +11,13 @@ interface MarkdownRendererProps {
   blocks: Block[];
   onDeleteBlock: (id: string) => void;
   onAddBlockAfter: (data: { sortableId: string; selectedType: string }) => void;
+  onUpdateBlockContent: (blockId: string, newText: string) => void;
 }
 
 // Helper pour générer l'ID de groupe
 const getListGroupId = (firstItem: ListItemBlock): string => `group-${firstItem.id}`;
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlock, onAddBlockAfter }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlock, onAddBlockAfter, onUpdateBlockContent }) => {
   logger.debug('[MarkdownRenderer] Rendering blocks:', blocks);
 
   if (!blocks) {
@@ -59,6 +60,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlo
           block={currentBlock} 
           onDelete={onDeleteBlock}
           onAddAfter={onAddBlockAfter}
+          onUpdateBlockContent={onUpdateBlockContent}
           index={currentIndex}
         />
       );
@@ -89,6 +91,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlo
               block={groupBlockRepresentation}
               onDelete={onDeleteBlock}
               onAddAfter={onAddBlockAfter}
+              onUpdateBlockContent={onUpdateBlockContent}
               index={currentIndex}
             >
               <ListGroupRenderer listItems={listItemGroup} />
