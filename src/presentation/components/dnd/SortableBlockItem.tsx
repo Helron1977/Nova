@@ -60,6 +60,7 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
   const [isPrimarySelectorOpen, setIsPrimarySelectorOpen] = useState(false);
   const [isMarkerSelectorOpen, setIsMarkerSelectorOpen] = useState(false);
   const [showInsertIndicator, setShowInsertIndicator] = useState(false);
+  const [indicatorColor, setIndicatorColor] = useState('blue');
   const closeMenuTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const sortableId = block.id;
@@ -154,7 +155,7 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
       );
   }
 
-  // --- Timer Logic --- 
+  // --- Timer Logic (MODIFIÉ) --- 
   const clearCloseTimer = () => {
     if (closeMenuTimerRef.current) {
       clearTimeout(closeMenuTimerRef.current);
@@ -167,14 +168,11 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
     closeMenuTimerRef.current = setTimeout(() => {
       setIsPrimarySelectorOpen(false);
       setIsMarkerSelectorOpen(false);
-      logger.debug('[SortableBlockItem] Menus closed by timeout');
-    }, 1500); // <<< Changer délai à 1.5 secondes >>>
+      setShowInsertIndicator(false); // << CORRIGÉ: Cacher l'indicateur quand le timer expire >>
+      logger.debug('[SortableBlockItem] Menus and indicator closed by timeout');
+    }, 1500); 
   };
-
-  // Nettoyer le timer au démontage
-  useEffect(() => {
-    return () => clearCloseTimer();
-  }, []);
+  useEffect(() => { return () => clearCloseTimer(); }, []);
 
   // --- Logique de visibilité des contrôles généraux --- 
   const showControls = () => {
@@ -189,9 +187,16 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
     // Si le menu est ouvert, le timer gérera la fermeture et le masquage
   };
 
-  // --- Indicateur --- 
-  const showIndicator = () => setShowInsertIndicator(true);
-  const hideIndicator = () => setShowInsertIndicator(false);
+  // --- Indicateur (SIMPLIFIÉ) --- 
+  const showIndicator = (color: 'blue' | 'green' = 'blue') => {
+    setShowInsertIndicator(true);
+    setIndicatorColor(color);
+    clearCloseTimer(); // Annuler le timer si on montre (survol actif)
+  };
+  const hideIndicator = () => {
+      // Démarrer/redémarrer le timer de fermeture. Le timer cachera l'indicateur.
+      startCloseTimer(); 
+  };
   
   // --- Logique Menu Radial --- 
   const handleTogglePrimarySelector = () => {
@@ -199,26 +204,35 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
     setIsPrimarySelectorOpen(opening);
     setIsMarkerSelectorOpen(false);
     if (opening) {
-      startCloseTimer(); // Démarrer le timer quand on ouvre
+        showIndicator('blue'); 
     } else {
-      clearCloseTimer(); // Annuler si on ferme manuellement
+        // Fermeture manuelle : cacher immédiatement et annuler timer
+        setShowInsertIndicator(false); 
+        clearCloseTimer(); 
     }
   };
 
+  // Clic sur une action du menu principal
   const handlePrimaryActionSelect = (type: string) => {
     logger.debug(`[SortableBlockItem] Primary action selected: ${type} for block: ${sortableId}`); 
     
     if (type === 'addListItemChild') {
       setIsMarkerSelectorOpen(true);
       setIsPrimarySelectorOpen(false);
-      startCloseTimer();
+      // Garder l'indicateur visible (sera caché par timer si inactif)
+      // showIndicator('green'); // On est déjà en survol, l'indicateur est déjà montré
+      startCloseTimer(); // Redémarrer le timer pour le sous-menu
     } else {
       onAddAfter({ sortableId: sortableId, selectedType: type });
       setIsPrimarySelectorOpen(false);
+      // Fermeture directe: cacher indicateur et annuler timer
+      setShowInsertIndicator(false); 
       clearCloseTimer();
     }
+    // << SUPPRIMÉ: setShowInsertIndicator(false); >>
   };
-
+  
+  // Clic sur un style de marqueur dans le sous-menu
   const handleMarkerStyleSelect = (markerStyle: MarkerStyle) => {
     logger.debug(`[SortableBlockItem] Marker style selected: ${markerStyle} for adding child to block: ${sortableId}`);
     onAddAfter({
@@ -227,8 +241,23 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
       markerStyle: markerStyle
     });
     setIsMarkerSelectorOpen(false);
+    // Fermeture directe: cacher indicateur et annuler timer
+    setShowInsertIndicator(false); 
     clearCloseTimer();
+     // << SUPPRIMÉ: setShowInsertIndicator(false); >>
   };
+  
+  // Handlers pour survol des icônes d'action (inchangés)
+  const handleActionIconMouseEnter = (actionType: string) => {
+      if (actionType === 'addListItemChild') {
+          showIndicator('green');
+      } else {
+          showIndicator('blue'); // Bleu pour les autres actions (sibling, types standard)
+      }
+  };
+  
+  // Utiliser hideIndicator standard pour la sortie (qui redémarre le timer)
+  const handleActionIconMouseLeave = () => { hideIndicator(); }; // Appelle startCloseTimer
 
   // << MODIFIÉ: Calculs basés sur menuActions dynamiques >>
   const primaryRadius = 65;
@@ -284,8 +313,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
                        : 'text-gray-400 hover:text-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'}`
                     }
           title="Ajouter un bloc après"
-          onMouseEnter={() => { showIndicator(); clearCloseTimer(); }}
-          onMouseLeave={() => { hideIndicator(); startCloseTimer(); }}
+          onMouseEnter={() => showIndicator('blue')}
+          onMouseLeave={hideIndicator}
         >
           <Plus size={16} />
       </button>
@@ -334,8 +363,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
                            cursor-pointer"
                   style={itemStyle}
                   title={label}
-                  onMouseEnter={clearCloseTimer}
-                  onMouseLeave={startCloseTimer}
+                  onMouseEnter={() => handleActionIconMouseEnter(type)}
+                  onMouseLeave={handleActionIconMouseLeave}
                 >
                   <Icon size={16} />
                 </div>
@@ -365,8 +394,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
                              cursor-pointer"
                   style={itemStyle}
                   title={label}
-                  onMouseEnter={clearCloseTimer}
-                  onMouseLeave={startCloseTimer}
+                  onMouseEnter={() => showIndicator('blue')}
+                  onMouseLeave={handleActionIconMouseLeave}
                 >
                   <Icon size={16} />
                 </div>
@@ -379,9 +408,10 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onD
         {contentToRender}
       </div>
 
-      {/* Indicateur d'insertion */}
+      {/* Indicateur d'insertion (MODIFIÉ) */}
       <div 
-        className={`absolute left-0 right-0 bottom-[-1px] h-[2px] bg-blue-500 
+        className={`absolute left-0 right-0 bottom-[-1px] h-[2px] 
+                   ${indicatorColor === 'green' ? 'bg-green-500' : 'bg-blue-500'} 
                    transition-opacity duration-150 ease-in-out 
                    ${showInsertIndicator ? 'opacity-100' : 'opacity-0'}`}
         style={{ pointerEvents: 'none' }}
