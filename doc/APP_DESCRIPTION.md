@@ -48,6 +48,7 @@ L'interface utilisateur est divisée en plusieurs panneaux principaux :
 *   **Édition Mermaid:** Écriture de code pour générer des diagrammes, avec prévisualisation live.
 *   **Interaction avec l'IA:** Bouton "Générer" pour obtenir du code Mermaid généré par IA.
 *   **Interaction Directe avec le Diagramme:** Modification des formes, couleurs, flèches via un menu contextuel sur la prévisualisation.
+*   **Indentation des Blocs:** Indentation/désindentation visuelle des blocs standards (paragraphes, etc.) via Tab/Shift+Tab en mode édition, reflétée dans la sortie Markdown.
 *   **Gestion des Configurations:** Sauvegarde/chargement de l'état complet de l'éditeur (voir section dédiée).
 *   **Export HTML:** Génération d'un fichier HTML contenant le rendu combiné Markdown + Mermaid.
 *   **Export/Import JSON:** Sauvegarde et chargement de la définition complète d'une configuration sur le disque local.
