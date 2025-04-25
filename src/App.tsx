@@ -89,19 +89,11 @@ const createTextInline = (text: string): TextInline => ({ type: 'text', value: t
 import { useBlocksManagement } from './application/hooks/useBlocksManagement';
 
 
-// << AJOUT: Importer le composant de menu contextuel >>
-import { MermaidContextMenu } from './presentation/components/menus/MermaidContextMenu';
+// << SUPPRIMÉ: Import du menu contextuel ici (devrait être géré ailleurs) >>
+// import { MermaidContextMenu } from './presentation/components/menus/MermaidContextMenu'; 
 
-// << AJOUT: Données factices pour le test du menu >>
-const mockShapes = [
-    { name: 'Rectangle', brackets: '[]', iconClass: '' },
-    { name: 'Circle', brackets: '(())', iconClass: '' },
-    { name: 'Round Edges', brackets: '()', iconClass: '' },
-    { name: 'Stadium', brackets: '([])', iconClass: '' },
-    { name: 'Cylinder', brackets: '[()]', iconClass: '' },
-    { name: 'Rhombus', brackets: '{}', iconClass: '' },
-    { name: 'Hexagon', brackets: '{{}}', iconClass: '' },
-];
+// << SUPPRIMÉ: Données factices pour le test du menu >>
+// const mockShapes = [...];
 
 function App() {
   const theme = useUiStore((state) => state.theme);
@@ -113,7 +105,7 @@ function App() {
     handleDeleteBlock,
     handleBlockContentChange,
     handleAddBlockAfter
-  } = useBlocksManagement(sampleMarkdown); // Passer le markdown initial au hook
+  } = useBlocksManagement(sampleMarkdown);
 
   // Configurer les capteurs pour dnd-kit (souris/toucher et clavier)
   const sensors = useSensors(
@@ -156,51 +148,29 @@ function App() {
     return ids;
   }, [blocks]);
 
-  // << AJOUT: États et Handlers pour le test du menu contextuel >>
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
-  const [currentColor, setCurrentColor] = useState('#FF6347'); // Couleur initiale pour test
-
-  const handleContextMenuTest = (event: React.MouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      // Important: Empêcher la propagation si on clique dans une zone déjà interactive (ex: le contenu de l'éditeur)
-      // Pour ce test simple, on l'active directement.
-      setMenuPosition({ x: event.clientX, y: event.clientY });
-      setMenuVisible(true);
-      logger.debug('[App Test] Context menu requested at:', {x: event.clientX, y: event.clientY});
-  };
-
-  const closeContextMenu = () => {
-      setMenuVisible(false);
-      logger.debug('[App Test] Closing context menu');
-  };
-
-  const handleShapeSelectedTest = (brackets: string) => {
-      logger.debug(`[App Test] Shape selected: ${brackets}`);
-      const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-      setCurrentColor(randomColor);
-      // onClose est appelé dans le composant menu lui-même après sélection
-  };
-  
-  const handleColorChangeTest = (color: string) => {
-      logger.debug(`[App Test] Color change requested: ${color}`);
-      // setCurrentColor(color); // Pourrait être activé plus tard
-  }
-  // << FIN AJOUT: États et Handlers pour le test du menu contextuel >>
+  // << SUPPRIMÉ: États et Handlers pour le test du menu contextuel >>
+  // const [menuVisible, setMenuVisible] = useState(false);
+  // const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  // const [currentColor, setCurrentColor] = useState('#FF6347');
+  // const handleContextMenuTest = (...) => { ... };
+  // const closeContextMenu = () => { ... };
+  // const handleShapeSelectedTest = (...) => { ... };
+  // const handleColorChangeTest = (...) => { ... };
+  // << FIN SUPPRESSION >>
 
   // JSX principal
   return (
     <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200`}>
       <Header />
       <MainContent>
-        {/* << AJOUT: Zone de test pour le clic droit >> */}
-        <div 
-          className="my-8 p-6 bg-yellow-100 dark:bg-yellow-800 border border-yellow-300 dark:border-yellow-600 rounded-md text-center text-yellow-800 dark:text-yellow-200"
-          onContextMenu={handleContextMenuTest} // Attach context menu handler here
+        {/* << SUPPRIMÉ: Zone de test pour le clic droit >> */}
+        {/* <div 
+          className="my-8 p-6 bg-yellow-100 ..."
+          onContextMenu={handleContextMenuTest}
         >
-            ZONE DE TEST : Clic droit ici pour voir le menu Mermaid (temporaire dans App.tsx).
-        </div>
-        {/* << FIN AJOUT: Zone de test >> */}
+            ZONE DE TEST ...
+        </div> */}
+        {/* << FIN SUPPRESSION >> */}
 
         <DndContext 
           sensors={sensors}
@@ -224,8 +194,8 @@ function App() {
       </MainContent>
       <Footer />
 
-      {/* << AJOUT: Rendu conditionnel du menu contextuel à la fin >> */}
-      <MermaidContextMenu 
+      {/* << SUPPRIMÉ: Rendu conditionnel du menu contextuel de test à la fin >> */}
+      {/* <MermaidContextMenu 
           isVisible={menuVisible}
           position={menuPosition}
           shapes={mockShapes}
@@ -233,7 +203,7 @@ function App() {
           onClose={closeContextMenu}
           onShapeSelect={handleShapeSelectedTest}
           onColorChange={handleColorChangeTest}
-      />
+      /> */}
     </div>
   );
 }

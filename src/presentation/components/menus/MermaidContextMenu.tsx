@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { HexColorPicker } from 'react-colorful';
 
 // Définition des types pour les props
 interface ShapeInfo {
@@ -78,30 +79,19 @@ export const MermaidContextMenu: React.FC<MermaidContextMenuProps> = ({
         top: `${position.y}px`,
       }}
     >
-        {/* Section Picker Couleur (Gauche) */}
-        <div className="p-3 flex justify-center items-center bg-transparent">
-            <div 
-                className="mermaid-color-wheel relative w-24 h-24 rounded-full border-2 border-white shadow-md cursor-crosshair"
-                style={{
-                    background: `conic-gradient(
-                        hsl(0, 100%, 50%), 
-                        hsl(60, 100%, 50%), 
-                        hsl(120, 100%, 50%), 
-                        hsl(180, 100%, 50%), 
-                        hsl(240, 100%, 50%), 
-                        hsl(300, 100%, 50%),
-                        hsl(360, 100%, 50%)
-                    )`,
-                    '--selected-color': selectedColor 
-                } as React.CSSProperties}
-                // onClick={(e) => { /* TODO: Logique de sélection de couleur */ console.log('Color wheel clicked'); onColorChange('#TODO'); }}
-            >
-                {/* Le cercle intérieur est maintenant géré par la classe CSS globale .mermaid-color-wheel::before */}
+        {/* Section Picker Couleur (Gauche) - REMPLACÉ */}
+        <div className="p-3 bg-white dark:bg-gray-800 rounded-l-xl shadow-md">
+            <HexColorPicker color={selectedColor} onChange={onColorChange} />
+            {/* Optionnel: Afficher la valeur Hex actuelle */}
+            <div className="mt-2 text-center text-xs text-gray-600 dark:text-gray-400 font-mono">
+                {selectedColor}
             </div>
         </div>
+        {/* FIN Section Picker Couleur */}
 
         {/* Conteneur pour les formes (Droite) */}
-        <div className="flex-1 self-stretch p-1 rounded-r-xl rounded-bl-none bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 overflow-hidden">
+        {/* NOTE: Ajustement du style pour qu'il colle bien au picker */}
+        <div className="flex-1 self-stretch p-1 rounded-r-xl rounded-l-none bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 overflow-hidden shadow-md">
              {/* En-tête Section Formes */}
              <div className="px-3 py-1 mb-1 text-xs font-medium text-white uppercase tracking-wider cursor-default opacity-80">
                  Formes Nœud
