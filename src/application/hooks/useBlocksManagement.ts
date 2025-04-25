@@ -18,6 +18,8 @@ interface UseBlocksManagementReturn {
   handleDeleteBlock: (idToDelete: string) => void;
   handleBlockContentChange: (blockId: string, newText: string) => void;
   handleAddBlockAfter: (data: { sortableId: string; selectedType: string; markerStyle?: MarkerStyle }) => void;
+  handleIncreaseIndentation: (blockId: string) => void;
+  handleDecreaseIndentation: (blockId: string) => void;
 }
 
 /**
@@ -48,10 +50,50 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
                   return items;
               }
               logger.debug(`[useBlocksManagement] Moving block from index ${oldIndex} to ${newIndex}`);
-              return arrayMove(items, oldIndex, newIndex);
+              
+              // Appliquer le déplacement
+              const movedItems = arrayMove(items, oldIndex, newIndex);
+
+              // << AJOUT: Logique d'ajustement de l'indentation après déplacement >>
+              const movedBlockId = active.id;
+              const finalIndex = movedItems.findIndex((item) => item.id === movedBlockId);
+
+              if (finalIndex !== -1) {
+                  const blockToUpdate = movedItems[finalIndex];
+                  // On n'ajuste l'indentation que pour les blocs NON-listItem
+                  if (blockToUpdate.type !== 'listItem') {
+                      let targetIndentationLevel = 0;
+                      if (finalIndex > 0) {
+                          const previousBlock = movedItems[finalIndex - 1];
+                          if (previousBlock.type === 'listItem') {
+                              // Basé sur la depth du listItem précédent
+                              targetIndentationLevel = (previousBlock as ListItemBlock).metadata.depth;
+                              logger.debug(`[useBlocksManagement] Moved block ${movedBlockId} after listItem, setting indentationLevel to ${targetIndentationLevel} (from listItem depth)`);
+                          } else {
+                              // Basé sur l'indentationLevel du bloc standard précédent
+                              targetIndentationLevel = previousBlock.metadata?.indentationLevel ?? 0;
+                              logger.debug(`[useBlocksManagement] Moved block ${movedBlockId} after standard block, setting indentationLevel to ${targetIndentationLevel}`);
+                          }
+                      } else {
+                           logger.debug(`[useBlocksManagement] Moved block ${movedBlockId} to top, setting indentationLevel to 0`);
+                      }
+
+                      // Mettre à jour le bloc déplacé avec la nouvelle indentation
+                      movedItems[finalIndex] = {
+                          ...blockToUpdate,
+                          metadata: {
+                              ...blockToUpdate.metadata,
+                              indentationLevel: targetIndentationLevel
+                          }
+                      };
+                  }
+              }
+              // -- Fin de la logique d'indentation --
+
+              return movedItems;
           });
       }
-  }, []); // Pas de dépendance externe directe, arrayMove est pur, setBlocks gère la clôture.
+  }, []);
 
   const handleDeleteBlock = useCallback((idToDelete: string) => {
       logger.debug(`[useBlocksManagement] Attempting to delete block with ID: ${idToDelete}`);
@@ -96,12 +138,57 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
           else if (originalBlock.type === 'paragraph') {
              logger.debug(`[useBlocksManagement] Paragraph edit detected for ${blockId}.`);
              try {
+                // << AJOUT: Sauvegarder l'indentation originale >>
+                const originalIndentationLevel = originalBlock.metadata?.indentationLevel;
+
                 let parsedNewBlocks = markdownToBlocks(newText);
                 if (parsedNewBlocks.length === 0) {
-                   parsedNewBlocks = [{ id: uuidv4(), type: 'paragraph', content: { children: [createTextInline('')] } }];
+                   // Crée un paragraphe vide s'il n'y a rien
+                   parsedNewBlocks = [{ id: uuidv4(), type: 'paragraph', content: { children: [createTextInline('')] }, metadata: { indentationLevel: originalIndentationLevel } }]; // << MODIF: Inclure indentationLevel >>
                 } else {
-                  parsedNewBlocks = parsedNewBlocks.map(block => ({ ...block, id: uuidv4() }));
+                  // Traiter les blocs parsés
+                  parsedNewBlocks = parsedNewBlocks.map(block => {
+                      const newId = uuidv4();
+                      const baseMetadata = block.metadata ?? {};
+                      let finalIndentationLevel = originalIndentationLevel; // Par défaut, on hérite
+
+                      // Si le bloc parsé est lui-même un paragraphe, on garde l'indentation originale.
+                      // Si c'est un autre type (ex: une liste créée en tapant "- "), 
+                      // l'indentationLevel sera ignoré par le renderer de ce nouveau type.
+                      // Si l'edit a créé plusieurs blocs, seul le premier héritera ? Pour l'instant, tous héritent.
+                      if (block.type !== 'listItem') { // Ne pas écraser la depth des listItems
+                          finalIndentationLevel = ('indentationLevel' in baseMetadata ? baseMetadata.indentationLevel : originalIndentationLevel) ?? 0;
+                      } else {
+                        finalIndentationLevel = undefined; // Les listItems n'utilisent pas indentationLevel
+                      }
+
+                      if (block.type === 'listItem') {
+                          return {
+                              ...block,
+                              id: newId,
+                              metadata: {
+                                  depth: (baseMetadata as any).depth ?? 0,
+                                  ordered: (baseMetadata as any).ordered ?? false,
+                                  checked: (baseMetadata as any).checked,
+                                  markerStyle: (baseMetadata as any).markerStyle,
+                                  position: baseMetadata.position
+                              }
+                          } as ListItemBlock;
+                      } else {
+                          // Pour les autres types, inclure l'indentation héritée/calculée
+                          return {
+                              ...block,
+                              id: newId,
+                              metadata: {
+                                  position: baseMetadata.position,
+                                  // << MODIF: Assigner finalIndentationLevel >>
+                                  indentationLevel: finalIndentationLevel 
+                              }
+                          };
+                      }
+                  });
                 }
+                // Remplacer l'ancien bloc par le(s) nouveau(x)
                 const updatedBlocks = [
                     ...currentBlocks.slice(0, editedBlockIndex),
                     ...parsedNewBlocks, 
@@ -223,16 +310,16 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
         // --- CAS B: TYPES DE BLOCS STANDARD (Identique à App.tsx) --- 
         else {
             switch (selectedType) {
-                case 'paragraph': newBlock = { id: newId, type: 'paragraph', content: { children: [createTextInline('Nouveau paragraphe')] } }; break; 
-                case 'heading1': newBlock = { id: newId, type: 'heading', content: { level: 1, children: [createTextInline('Nouveau Titre 1')] } }; break;
-                case 'heading2': newBlock = { id: newId, type: 'heading', content: { level: 2, children: [createTextInline('Nouveau Titre 2')] } }; break;
-                case 'code': newBlock = { id: newId, type: 'code', content: { code: '// Votre code ici...', language: 'plaintext' } }; break;
-                case 'mermaid': newBlock = { id: newId, type: 'mermaid', content: { code: 'graph TD;\n  A-->B;' } }; break;
-                case 'image': newBlock = { id: newId, type: 'image', content: { src: 'https://via.placeholder.com/150', alt: 'Nouvelle image' } }; break;
-                case 'blockquote': newBlock = { id: newId, type: 'blockquote', content: { children: [createTextInline('Nouvelle citation')] } }; break;
-                case 'table': newBlock = { id: newId, type: 'table', content: { align: ['left', 'left'], rows: [[[{ type: 'text', value: 'Header' }],[{ type: 'text', value: 'Header' }]],[[{ type: 'text', value: 'Cell' }],[{ type: 'text', value: 'Cell' }]]]}}; break;
-                case 'html': newBlock = { id: newId, type: 'html', content: { html: '<div>Nouveau HTML</div>' } }; break;
-                case 'thematicBreak': newBlock = { id: newId, type: 'thematicBreak', content: {} }; break;
+                case 'paragraph': newBlock = { id: newId, type: 'paragraph', content: { children: [createTextInline('Nouveau paragraphe')] }, metadata: {} }; break; 
+                case 'heading1': newBlock = { id: newId, type: 'heading', content: { level: 1, children: [createTextInline('Nouveau Titre 1')] }, metadata: {} }; break;
+                case 'heading2': newBlock = { id: newId, type: 'heading', content: { level: 2, children: [createTextInline('Nouveau Titre 2')] }, metadata: {} }; break;
+                case 'code': newBlock = { id: newId, type: 'code', content: { code: '// Votre code ici...', language: 'plaintext' }, metadata: {} }; break;
+                case 'mermaid': newBlock = { id: newId, type: 'mermaid', content: { code: 'graph TD;\n  A-->B;' }, metadata: {} }; break;
+                case 'image': newBlock = { id: newId, type: 'image', content: { src: 'https://via.placeholder.com/150', alt: 'Nouvelle image' }, metadata: {} }; break;
+                case 'blockquote': newBlock = { id: newId, type: 'blockquote', content: { children: [createTextInline('Nouvelle citation')] }, metadata: {} }; break;
+                case 'table': newBlock = { id: newId, type: 'table', content: { align: ['left', 'left'], rows: [[[{ type: 'text', value: 'Header' }],[{ type: 'text', value: 'Header' }]],[[{ type: 'text', value: 'Cell' }],[{ type: 'text', value: 'Cell' }]]]}, metadata: {} }; break;
+                case 'html': newBlock = { id: newId, type: 'html', content: { html: '<div>Nouveau HTML</div>' }, metadata: {} }; break;
+                case 'thematicBreak': newBlock = { id: newId, type: 'thematicBreak', content: {}, metadata: {} }; break;
                 default: logger.warn(`[useBlocksManagement] Unknown or unhandled standard block type selected: ${selectedType}`);
             }
             logger.debug(`[useBlocksManagement] Created new standard block:`, newBlock);
@@ -251,6 +338,51 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
     });
   }, []); // Dépend de setBlocks implicitement
 
+  // --- Fonctions de rappel (extraites de App.tsx) --- 
+
+  // --- Logique d'indentation ---
+  const handleIncreaseIndentation = useCallback((blockId: string) => {
+      logger.debug(`[useBlocksManagement] Increasing indentation for block: ${blockId}`);
+      setBlocks(currentBlocks => 
+          currentBlocks.map(block => {
+              if (block.id === blockId && block.type !== 'listItem') { // Ne pas modifier la depth des listItems ici
+                  const currentLevel = block.metadata.indentationLevel ?? 0;
+                  const newLevel = currentLevel + 1;
+                  logger.debug(`[useBlocksManagement] Block ${blockId} - New indentation level calculated: ${newLevel}`);
+                  const updatedBlock = {
+                      ...block,
+                      metadata: { ...block.metadata, indentationLevel: newLevel }
+                  };
+                  logger.debug(`[useBlocksManagement] Block ${blockId} - Returning updated block:`, JSON.stringify(updatedBlock));
+                  return updatedBlock;
+              }
+              return block;
+          })
+      );
+  }, []); // Dépend implicitement de setBlocks
+
+  const handleDecreaseIndentation = useCallback((blockId: string) => {
+      logger.debug(`[useBlocksManagement] Decreasing indentation for block: ${blockId}`);
+      setBlocks(currentBlocks => 
+          currentBlocks.map(block => {
+              if (block.id === blockId && block.type !== 'listItem') {
+                  const currentLevel = block.metadata.indentationLevel ?? 0;
+                  if (currentLevel > 0) {
+                      const newLevel = currentLevel - 1;
+                      logger.debug(`[useBlocksManagement] New indentation level: ${newLevel}`);
+                      return {
+                          ...block,
+                          metadata: { ...block.metadata, indentationLevel: newLevel }
+                      };
+                  } else {
+                     logger.debug(`[useBlocksManagement] Already at minimum indentation (0).`);
+                  }
+              }
+              return block;
+          })
+      );
+  }, []); // Dépend implicitement de setBlocks
+
   // Retourner l'état et les fonctions
   return {
     blocks,
@@ -258,5 +390,7 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
     handleDeleteBlock,
     handleBlockContentChange,
     handleAddBlockAfter,
+    handleIncreaseIndentation,
+    handleDecreaseIndentation,
   };
 }; 

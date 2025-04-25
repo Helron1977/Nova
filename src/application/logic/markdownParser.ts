@@ -74,8 +74,9 @@ export type InlineElement =
 interface BaseBlock {
   id: string;
   type: string;
-  metadata?: {
+  metadata: {
     position?: Position;
+    indentationLevel?: number;
     [key: string]: any;
   };
   content: any; // Typé spécifiquement dans chaque bloc

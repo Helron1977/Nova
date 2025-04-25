@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { ParagraphBlock, InlineElement } from '@/application/logic/markdownParser';
 import { renderInlineElements } from './InlineElementRenderer';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
@@ -12,6 +12,8 @@ interface CustomParagraphRendererProps {
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number;
   index?: number;
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any;
 }
 
@@ -49,8 +51,9 @@ const extractRawText = (elements: InlineElement[] | undefined): string => {
 const CustomParagraphRendererComponent = React.forwardRef<
   HTMLDivElement,
   CustomParagraphRendererProps
->(({ block, style, onUpdateBlockContent, listIndex, index, ...rest }, ref) => {
+>(({ block, style, onUpdateBlockContent, listIndex, index, onIncreaseIndentation, onDecreaseIndentation, ...rest }, ref) => {
   const { children } = block.content;
+  const { indentationLevel } = block.metadata;
   const [isEditing, setIsEditing] = useState(false);
   
   useEffect(() => {
@@ -95,13 +98,43 @@ const CustomParagraphRendererComponent = React.forwardRef<
       handleSave();
     } else if (event.key === 'Escape') {
       handleCancel();
+    } else if (event.key === 'Tab') {
+        event.preventDefault();
+        if (event.shiftKey) {
+            if (onDecreaseIndentation) {
+                logger.debug(`[CustomParagraphRenderer - ${block.id}] Shift+Tab detected. Calling onDecreaseIndentation.`);
+                onDecreaseIndentation(block.id);
+            } else {
+                logger.warn(`[CustomParagraphRenderer - ${block.id}] onDecreaseIndentation is not defined.`);
+            }
+        } else {
+            if (onIncreaseIndentation) {
+                logger.debug(`[CustomParagraphRenderer - ${block.id}] Tab detected. Calling onIncreaseIndentation.`);
+                onIncreaseIndentation(block.id);
+            } else {
+                logger.warn(`[CustomParagraphRenderer - ${block.id}] onIncreaseIndentation is not defined.`);
+            }
+        }
     }
   };
 
-  logger.debug(`[CustomParagraphRenderer - ${block.id}] Rendering - isEditing: ${isEditing}, editText: ${editText}`);
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    if (level > 0) {
+        return `${level * 1.5}rem`;
+    } 
+    return '0rem';
+  }, [indentationLevel]);
+
+  const combinedStyle = useMemo(() => ({ 
+      ...style, 
+      paddingLeft: indentationPadding 
+  }), [style, indentationPadding]);
+
+  logger.debug(`[CustomParagraphRenderer - ${block.id}] Rendering - Indentation Level: ${indentationLevel ?? 0}, Padding: ${indentationPadding}`);
 
   return (
-    <div ref={ref} style={style} {...rest}>
+    <div ref={ref} style={combinedStyle} {...rest}>
       {isEditing ? (
         <textarea
             value={editText}
@@ -117,6 +150,7 @@ const CustomParagraphRendererComponent = React.forwardRef<
           key={block.id}
           onDoubleClick={handleDoubleClick}
           title="Double-cliquez pour modifier"
+          className={`ml-[${indentationPadding}]!`}
         >
           {renderInlineElements(children, block.id)}
         </p>

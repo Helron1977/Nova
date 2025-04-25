@@ -11,9 +11,11 @@ interface MarkdownRendererProps {
   onDeleteBlock: (id: string) => void;
   onAddBlockAfter: (data: { sortableId: string; selectedType: string; markerStyle?: MarkerStyle }) => void;
   onUpdateBlockContent: (blockId: string, newText: string) => void;
+  onIncreaseIndentation: (blockId: string) => void;
+  onDecreaseIndentation: (blockId: string) => void;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlock, onAddBlockAfter, onUpdateBlockContent }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlock, onAddBlockAfter, onUpdateBlockContent, onIncreaseIndentation, onDecreaseIndentation }) => {
   logger.debug('[MarkdownRenderer] Rendering blocks:', blocks);
 
   if (!blocks) {
@@ -62,6 +64,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, onDeleteBlo
         onUpdateBlockContent={onUpdateBlockContent}
         index={index}
         listIndex={listIndex}
+        onIncreaseIndentation={onIncreaseIndentation}
+        onDecreaseIndentation={onDecreaseIndentation}
       />
     );
   });

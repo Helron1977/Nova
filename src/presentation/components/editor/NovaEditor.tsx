@@ -33,6 +33,8 @@ export const NovaEditor: React.FC<NovaEditorProps> = ({
     handleDeleteBlock,
     handleBlockContentChange,
     handleAddBlockAfter,
+    handleIncreaseIndentation,
+    handleDecreaseIndentation,
   } = useBlocksManagement(initialMarkdown);
 
   // << SUPPRESSION: Log pour vérifier les blocs internes >>
@@ -85,6 +87,8 @@ export const NovaEditor: React.FC<NovaEditorProps> = ({
             onDeleteBlock={handleDeleteBlock}
             onAddBlockAfter={handleAddBlockAfter}
             onUpdateBlockContent={handleBlockContentChange}
+            onIncreaseIndentation={handleIncreaseIndentation}
+            onDecreaseIndentation={handleDecreaseIndentation}
           />
         </>
       </SortableContext>

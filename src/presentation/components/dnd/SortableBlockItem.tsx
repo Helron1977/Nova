@@ -16,6 +16,8 @@ interface SortableBlockItemProps {
   onDelete: (id: string) => void;
   onAddAfter: (data: { sortableId: string; selectedType: string; markerStyle?: MarkerStyle }) => void;
   onUpdateBlockContent: (blockId: string, newText: string) => void;
+  onIncreaseIndentation: (blockId: string) => void;
+  onDecreaseIndentation: (blockId: string) => void;
   index: number;
   listIndex?: number;
 }
@@ -60,6 +62,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({
   onDelete, 
   onAddAfter, 
   onUpdateBlockContent, 
+  onIncreaseIndentation, 
+  onDecreaseIndentation,
   listIndex,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
@@ -152,6 +156,10 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({
                           block={block} 
                           onUpdateBlockContent={onUpdateBlockContent} 
                           listIndex={listIndex}
+                          {...({ 
+                              onIncreaseIndentation: onIncreaseIndentation, 
+                              onDecreaseIndentation: onDecreaseIndentation 
+                          } as any)}
                         />;
   } else {
       contentToRender = (
