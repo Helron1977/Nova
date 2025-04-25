@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import mermaid from 'mermaid';
 import type { MermaidBlock } from '@/application/logic/markdownParser';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
@@ -28,9 +28,23 @@ const CustomMermaidRenderer = React.forwardRef<
   ...rest 
 }, ref) => {
   const { code } = block.content;
+  const { metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
   const mermaidRef = useRef<HTMLDivElement>(null); // Ref interne pour Mermaid
   const renderedCodeRef = useRef<string | null>(null);
   const isRenderingRef = useRef(false); // Ref de verrouillage
+
+  // Calcul du style d'indentation
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
+  // Combinaison des styles
+  const combinedStyle = useMemo(() => ({
+    ...style,
+    marginLeft: indentationPadding
+  }), [style, indentationPadding]);
 
   useEffect(() => {
     const currentCode = (typeof code === 'string' && code.trim() !== '') ? code.trim() : null;
@@ -112,7 +126,7 @@ const CustomMermaidRenderer = React.forwardRef<
     <div 
       key={block.id} 
       ref={combinedRef} // Utiliser la ref combinée
-      style={style} 
+      style={combinedStyle} // Utiliser combinedStyle
       {...rest} 
       className="mermaid-container p-2 border border-dashed border-transparent hover:border-gray-300 dark:hover:border-gray-600"
     >

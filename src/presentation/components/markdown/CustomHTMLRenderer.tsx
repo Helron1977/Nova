@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import type { HTMLBlock } from '@/application/logic/markdownParser';
 
@@ -24,6 +24,18 @@ const CustomHTMLRenderer = React.forwardRef<
   ...rest 
 }, ref) => {
   const { html } = block.content;
+  const { metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
+
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
+  const combinedStyle = useMemo(() => ({
+    ...style,
+    marginLeft: indentationPadding
+  }), [style, indentationPadding]);
 
   // Nettoyer le HTML avant de l'insérer
   const cleanHTML = DOMPurify.sanitize(html);
@@ -39,7 +51,7 @@ const CustomHTMLRenderer = React.forwardRef<
     <div 
       key={block.id} 
       ref={ref} // Attacher la ref
-      style={style} // Appliquer le style DND
+      style={combinedStyle} // Appliquer le style DND
       {...rest} // Appliquer DND/data-* props
       dangerouslySetInnerHTML={{ __html: cleanHTML }}
     />

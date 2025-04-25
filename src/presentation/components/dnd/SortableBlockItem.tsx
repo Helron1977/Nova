@@ -156,10 +156,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({
                           block={block} 
                           onUpdateBlockContent={onUpdateBlockContent} 
                           listIndex={listIndex}
-                          {...({ 
-                              onIncreaseIndentation: onIncreaseIndentation, 
-                              onDecreaseIndentation: onDecreaseIndentation 
-                          } as any)}
+                          onIncreaseIndentation={onIncreaseIndentation}
+                          onDecreaseIndentation={onDecreaseIndentation}
                         />;
   } else {
       contentToRender = (

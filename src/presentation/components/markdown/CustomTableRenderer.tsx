@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { TableBlock, InlineElement } from '@/application/logic/markdownParser';
 import { renderInlineElements } from './InlineElementRenderer';
 
@@ -23,6 +23,18 @@ const CustomTableRenderer = React.forwardRef<
   ...rest 
 }, ref) => {
   const { align, rows } = block.content;
+  const { metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
+
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
+  const combinedStyle = useMemo(() => ({
+    ...style,
+    marginLeft: indentationPadding
+  }), [style, indentationPadding]);
 
   if (!rows || rows.length === 0) {
     return null; // Ne rien rendre si pas de lignes
@@ -46,7 +58,7 @@ const CustomTableRenderer = React.forwardRef<
   };
 
   return (
-    <table key={block.id} ref={ref} style={style} {...rest}>
+    <table key={block.id} ref={ref} style={combinedStyle} {...rest}>
       <thead>
         <tr>
           {headerRow.map((cellContent: InlineElement[], index: number) => (

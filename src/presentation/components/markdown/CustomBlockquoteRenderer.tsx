@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { BlockquoteBlock, InlineElement, TextInline } from '@/application/logic/markdownParser';
 import { renderInlineElements } from './InlineElementRenderer';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
@@ -44,11 +44,24 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   index, 
   ...rest 
 }, ref) => {
-  const { id, content: { children } } = block;
+  const { id, content: { children }, metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
+  const combinedStyle = useMemo(() => ({
+    ...style,
+    marginLeft: indentationPadding
+  }), [style, indentationPadding]);
+
+  logger.debug(`[BlockquoteRenderer ${id}] Rendering - Indentation Level: ${indentationLevel ?? 0}, marginLeft: ${indentationPadding}`);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -101,7 +114,7 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
     <blockquote 
       key={block.id} 
       ref={ref} 
-      style={style} 
+      style={combinedStyle}
       {...rest} 
       onDoubleClick={handleDoubleClick}
       className="relative border-l-4 border-gray-300 pl-4 italic my-4 dark:border-gray-600"

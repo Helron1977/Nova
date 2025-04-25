@@ -8,6 +8,8 @@ export type SortableBlockRendererProps = {
   attributes?: Record<string, any>; // Attributs appliqués par dnd-kit (aria, etc.)
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number; // << AJOUT: Index dans la liste (pour numérotation) >>
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
 };
 
 // Type définissant un composant React qui:

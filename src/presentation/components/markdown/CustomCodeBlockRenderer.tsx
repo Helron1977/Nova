@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import Prism from 'prismjs';
 // Importer les CSS nécessaires (peut nécessiter un ajustement du chemin/config)
 // import 'prismjs/themes/prism-okaidia.css'; // Exemple de thème
@@ -25,7 +25,19 @@ const CustomCodeBlockRenderer = React.forwardRef<
   CustomCodeBlockRendererProps
 >(({ block, style, ...rest }, ref) => {
   const { language, code } = block.content;
+  const { metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
   const langClass = language ? `language-${language}` : 'language-plain';
+
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
+  const combinedStyle = useMemo(() => ({
+    ...style,
+    marginLeft: indentationPadding
+  }), [style, indentationPadding]);
 
   useEffect(() => {
     // Lancer Prism après le rendu ou une mise à jour
@@ -36,7 +48,7 @@ const CustomCodeBlockRenderer = React.forwardRef<
     <pre 
       key={block.id} 
       ref={ref} 
-      style={style} 
+      style={combinedStyle}
       className={`${langClass} relative group`} // Ajouter la classe de langage pour Prism
       {...rest} // Appliquer DND/data-* props
     >
