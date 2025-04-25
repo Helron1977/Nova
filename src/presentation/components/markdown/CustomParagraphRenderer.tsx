@@ -10,6 +10,8 @@ interface CustomParagraphRendererProps {
   block: ParagraphBlock;
   style?: React.CSSProperties;
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex?: number;
+  index?: number;
   [key: string]: any;
 }
 
@@ -47,7 +49,7 @@ const extractRawText = (elements: InlineElement[] | undefined): string => {
 const CustomParagraphRendererComponent = React.forwardRef<
   HTMLDivElement,
   CustomParagraphRendererProps
->(({ block, style, onUpdateBlockContent, ...rest }, ref) => {
+>(({ block, style, onUpdateBlockContent, listIndex, index, ...rest }, ref) => {
   const { children } = block.content;
   const [isEditing, setIsEditing] = useState(false);
   

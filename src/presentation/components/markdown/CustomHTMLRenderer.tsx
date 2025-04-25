@@ -5,6 +5,9 @@ import type { HTMLBlock } from '@/application/logic/markdownParser';
 interface CustomHTMLRendererProps {
   block: HTMLBlock;
   style?: React.CSSProperties;
+  onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex?: number;
+  index?: number;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -12,7 +15,14 @@ interface CustomHTMLRendererProps {
 const CustomHTMLRenderer = React.forwardRef<
   HTMLDivElement, // Type de l'élément DOM racine (div)
   CustomHTMLRendererProps
->(({ block, style, ...rest }, ref) => {
+>(({ 
+  block, 
+  style, 
+  onUpdateBlockContent,
+  listIndex,
+  index,
+  ...rest 
+}, ref) => {
   const { html } = block.content;
 
   // Nettoyer le HTML avant de l'insérer

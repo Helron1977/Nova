@@ -55,7 +55,13 @@ const markerStyleOptions: { style: MarkerStyle; label: string; Icon: React.Eleme
   { style: 'lower-roman', label: 'Romain (i.)', Icon: VenetianMask }, // Utiliser VenetianMask en attendant mieux
 ];
 
-export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ block, onDelete, onAddAfter, onUpdateBlockContent, listIndex }) => {
+export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ 
+  block, 
+  onDelete, 
+  onAddAfter, 
+  onUpdateBlockContent, 
+  listIndex,
+}) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isPrimarySelectorOpen, setIsPrimarySelectorOpen] = useState(false);
   const [isMarkerSelectorOpen, setIsMarkerSelectorOpen] = useState(false);

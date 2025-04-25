@@ -29,6 +29,7 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
   // État des blocs
   const initialBlocks = useMemo(() => {
       logger.debug('[useBlocksManagement] Initializing blocks from markdown...');
+      // Revenir à l'appel direct sans try/catch ni logs supplémentaires ici
       return markdownToBlocks(initialMarkdown);
   }, [initialMarkdown]);
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);

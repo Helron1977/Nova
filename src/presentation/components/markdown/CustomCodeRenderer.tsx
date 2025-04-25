@@ -8,10 +8,18 @@ const logger = new PinoLogger();
 interface CustomCodeRendererProps {
   block: CodeBlock | MermaidBlock;
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex: number;
+  index: number;
   [key: string]: any; // Pour les props DND etc.
 }
 
-const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ block, onUpdateBlockContent, ...rest }) => {
+const CustomCodeRenderer: React.FC<CustomCodeRendererProps> = ({ 
+  block, 
+  onUpdateBlockContent, 
+  listIndex, 
+  index, 
+  ...rest 
+}) => {
   const { id } = block;
   const code = block.content?.code || '';
   const language = block.type === 'code' ? block.content?.language : 'mermaid';

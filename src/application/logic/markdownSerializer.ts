@@ -202,23 +202,29 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                 break;
         }
         
-        // Gérer les sauts de ligne
+        // Gérer les sauts de ligne (Logique révisée)
         if (index > 0) {
-             // Toujours au moins un saut de ligne entre les blocs
-             markdownOutput += '\n'; 
-             // Ajouter un deuxième saut de ligne si nécessaire (avant bloc non-listItem ou rupture de liste)
-            if (needsExtraNewline && (!isListItem || !previousBlockType || previousBlockType !== 'listItem')) {                 markdownOutput += '\n'; 
+            const prevBlock = blocks[index - 1];
+            // Ajouter deux sauts de ligne par défaut
+            markdownOutput += '\n\n'; 
+
+            // Exception: Si le bloc actuel ET le précédent sont des listItems
+            // ET le bloc actuel n'est PAS moins indenté (il continue ou s'enfonce)
+            // alors on retire un saut de ligne (pour n'en laisser qu'un seul)
+            if (block.type === 'listItem' && prevBlock.type === 'listItem') {
+                const currentDepth = (block as ListItemBlock).metadata.depth;
+                const prevDepth = (prevBlock as ListItemBlock).metadata.depth;
+                if (currentDepth >= prevDepth) {
+                    markdownOutput = markdownOutput.slice(0, -1); // Retire le dernier \n
+                    // Cas spécial: si on change de type de liste (ordonné/non ordonné) au même niveau,
+                    // certains parseurs aiment quand même un saut de ligne double.
+                    // Pour l'instant, on garde simple: un seul saut si même niveau ou plus profond.
+                }
             }
-        }
-        
-        // Si ce n'est pas un listItem, réinitialiser l'état de la liste pour le prochain bloc
-        if (!isListItem) {
-             previousListDepth = -1;
-             previousListOrdered = false;
         }
 
         markdownOutput += blockMarkdown;
-        previousBlockType = block.type;
+        previousBlockType = block.type; // Garder previousBlockType peut être utile ailleurs
     });
 
     return markdownOutput.trim(); 

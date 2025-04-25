@@ -4,17 +4,27 @@ import type { ImageBlock } from '@/application/logic/markdownParser';
 interface CustomImageRendererProps {
   block: ImageBlock;
   style?: React.CSSProperties;
+  onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex?: number;
+  index?: number;
   [key: string]: any; // Pour props DND/data-*
 }
 
 const CustomImageRenderer = React.forwardRef<
   HTMLImageElement, // L'élément racine est <img>
   CustomImageRendererProps
->(({ block, style, ...rest }, ref) => { // Utiliser ...rest
+>(({ 
+  block, 
+  style, 
+  onUpdateBlockContent,
+  listIndex,
+  index,
+  ...rest 
+}, ref) => { // Utiliser ...rest
   const { src, alt, title } = block.content;
 
   return (
-    // Appliquer props au <img>
+    // Appliquer seulement `rest` à <img>
     <img 
       key={block.id} 
       ref={ref} 

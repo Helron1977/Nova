@@ -5,13 +5,23 @@ import { renderInlineElements } from './InlineElementRenderer';
 interface CustomTableRendererProps {
   block: TableBlock;
   style?: React.CSSProperties;
+  onUpdateBlockContent?: (blockId: string, newText: string) => void;
+  listIndex?: number;
+  index?: number;
   attributes?: Record<string, any>;
 }
 
 const CustomTableRenderer = React.forwardRef<
   HTMLTableElement,
   CustomTableRendererProps
->(({ block, style, ...attributes }, ref) => {
+>(({ 
+  block, 
+  style, 
+  onUpdateBlockContent,
+  listIndex,
+  index,
+  ...rest 
+}, ref) => {
   const { align, rows } = block.content;
 
   if (!rows || rows.length === 0) {
@@ -36,7 +46,7 @@ const CustomTableRenderer = React.forwardRef<
   };
 
   return (
-    <table key={block.id} ref={ref} style={style} {...attributes}>
+    <table key={block.id} ref={ref} style={style} {...rest}>
       <thead>
         <tr>
           {headerRow.map((cellContent: InlineElement[], index: number) => (

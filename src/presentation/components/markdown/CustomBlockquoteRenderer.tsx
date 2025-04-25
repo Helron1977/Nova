@@ -9,6 +9,8 @@ interface CustomBlockquoteRendererProps {
   block: BlockquoteBlock;
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
   style?: React.CSSProperties;
+  listIndex?: number;
+  index?: number;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -34,7 +36,14 @@ const getRawTextFromChildren = (children: InlineElement[] | undefined): string =
 const CustomBlockquoteRendererComponent = React.forwardRef<
   HTMLQuoteElement,
   CustomBlockquoteRendererProps
->(({ block, style, onUpdateBlockContent, ...rest }, ref) => {
+>(({ 
+  block, 
+  style, 
+  onUpdateBlockContent, 
+  listIndex, 
+  index, 
+  ...rest 
+}, ref) => {
   const { id, content: { children } } = block;
 
   const [isEditing, setIsEditing] = useState(false);
