@@ -30,7 +30,7 @@
     "forceConsistentCasingInFileNames": true,
 
     /* Test Runner Types */
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["node", "vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

@@ -1,34 +1,44 @@
-import { defineConfig, type UserConfig } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import type { InlineConfig } from 'vitest'
 import path from 'path'
-/// <reference types="vitest/config" />
+// Il faut aussi importer les types pour la config Vitest
+import type { UserConfig } from 'vite'
+import type { InlineConfig } from 'vitest'
 
-// Fusionner les types pour la configuration
+// On peut définir une interface pour combiner les deux configurations
 interface VitestConfigExport extends UserConfig {
   test: InlineConfig
 }
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Forcer une seule instance pour ces paquets CodeMirror
+    dedupe: [
+      '@codemirror/state',
+      '@codemirror/view',
+      '@codemirror/commands',
+      '@codemirror/language',
+      // Ajoutez d'autres paquets @codemirror/* que vous utilisez directement ici
+    ],
   },
-  server: {
-    port: 5000,
-  },
+  // On retire l'exclusion ici
   // optimizeDeps: {
-  //   include: ['loglevel'],
+  //   exclude: ['@codemirror/state'],
   // },
+  build: {
+    outDir: '../electron/dist_vite', // Spécifier le répertoire de sortie pour Electron
+    emptyOutDir: true, // Vider le répertoire avant de construire
+  },
+  base: './', // Important pour Electron pour résoudre correctement les chemins
   // Ajouter la configuration pour Vitest
   test: {
-    globals: true, // Pour ne pas avoir à importer describe, it, etc. partout
-    environment: 'jsdom', // Utiliser jsdom pour simuler un environnement navigateur (inclut localStorage)
-    setupFiles: './src/setupTests.ts', // Fichier optionnel pour setup global des tests
+    globals: true, // <-- C'est la ligne clé !
+    environment: 'jsdom', // Important pour les tests React et DOM
+    // setupFiles: './src/setupTests.ts', // Décommentez si vous avez un fichier de setup
   },
-} as VitestConfigExport)
+} as VitestConfigExport) // Important: caster la config

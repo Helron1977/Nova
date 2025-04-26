@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { HeadingBlock, InlineElement, TextInline } from '@/application/logic/markdownParser';
 import remarkGfm from 'remark-gfm';
@@ -37,7 +37,8 @@ const getRawTextFromChildren = (children: InlineElement[] | undefined): string =
 
 // << MODIFIÉ: Implémentation de l'édition "texte pur" >>
 const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, onUpdateBlockContent }) => {
-  const { id, content: { level, children } } = block;
+  const { id, content: { level, children }, metadata } = block;
+  const indentationLevel = metadata?.indentationLevel;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
@@ -87,11 +88,22 @@ const CustomHeadingRenderer: React.FC<CustomHeadingRendererProps> = ({ block, on
     }
   };
 
+  // Calculer le padding basé sur l'indentation
+  const indentationPadding = useMemo(() => {
+    const level = indentationLevel ?? 0;
+    return level > 0 ? `${level * 1.5}rem` : '0rem';
+  }, [indentationLevel]);
+
   // Contenu pour l'affichage (non-édition)
   const markdownContent = getRawTextFromChildren(children);
 
   return (
-    <div className="my-1 py-1" onDoubleClick={handleDoubleClick}>
+    <div 
+      className="my-1 py-1" 
+      onClick={handleDoubleClick} 
+      title="Cliquez pour modifier"
+      style={{ paddingLeft: indentationPadding }}
+    >
       {isEditing ? (
         <input
           ref={inputRef}

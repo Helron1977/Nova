@@ -182,8 +182,8 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
   return (
     <div 
       key={id}
-      onDoubleClick={handleDoubleClick}
-      title="Double-cliquez pour modifier"
+      onClick={handleDoubleClick}
+      title="Cliquez pour modifier"
       className="list-item-content"
     >
       {contentWithMarker}
