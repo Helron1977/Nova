@@ -6,7 +6,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { keymap, EditorView } from '@codemirror/view';
-import { history, historyKeymap, defaultKeymap, indentWithTab, insertNewline } from '@codemirror/commands';
+import { history, historyKeymap,  insertNewline } from '@codemirror/commands';
 import { Prec, EditorState, ChangeSpec } from '@codemirror/state';
 
 // Instancier le logger au niveau du module
@@ -102,12 +102,7 @@ const InlineFormatMenu: React.FC<InlineFormatMenuProps> = ({ isVisible, top, lef
       backgroundColor: 'white',
   };
 
-  const disabledButtonStyle: React.CSSProperties = {
-      ...buttonStyle,
-      color: '#aaa',
-      cursor: 'not-allowed',
-      backgroundColor: '#eee',
-  };
+
 
   const handleFormatClick = (formatType: 'bold' | 'italic' | 'strikethrough' | 'link' | 'inlineCode') => {
     onFormat(formatType);
@@ -137,6 +132,10 @@ const CustomParagraphRendererComponent = React.forwardRef<
   HTMLDivElement,
   CustomParagraphRendererProps
 >(({ block, style, onUpdateBlockContent, listIndex, index, onIncreaseIndentation, onDecreaseIndentation, ...rest }, ref) => {
+
+  // << AJOUT: Log pour vérifier les props d'indentation >>
+  logger.debug(`[CustomParagraphRenderer ${block.id}] Received props: onIncreaseIndentation is ${typeof onIncreaseIndentation}, onDecreaseIndentation is ${typeof onDecreaseIndentation}`);
+
   const { children } = block.content;
   const { indentationLevel } = block.metadata;
   const [isEditing, setIsEditing] = useState(false);

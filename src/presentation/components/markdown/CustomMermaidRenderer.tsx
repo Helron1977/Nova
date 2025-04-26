@@ -12,6 +12,8 @@ interface CustomMermaidRendererProps {
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number;
   index?: number;
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
   attributes?: Record<string, any>;
 }
 
@@ -25,6 +27,8 @@ const CustomMermaidRenderer = React.forwardRef<
   onUpdateBlockContent,
   listIndex,
   index,
+  onIncreaseIndentation,
+  onDecreaseIndentation,
   ...rest 
 }, ref) => {
   const { code } = block.content;

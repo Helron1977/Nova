@@ -205,27 +205,72 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
           else if (['heading', 'code', 'blockquote', 'listItem'].includes(originalBlock.type)) {
               logger.debug(`[useBlocksManagement] Pure text update detected for ${originalBlock.type} block ${blockId}.`);
               try {
-                const updatedBlock = JSON.parse(JSON.stringify(originalBlock));
-                switch (updatedBlock.type) {
+                let updatedBlock: Block | null = null;
+
+                // Mettre à jour le contenu spécifique au type tout en préservant le type et les métadonnées
+                switch (originalBlock.type) {
                     case 'heading':
+                        updatedBlock = {
+                            ...originalBlock,
+                            metadata: { ...originalBlock.metadata }, // Préserver les métadonnées
+                            content: { 
+                                ...originalBlock.content,
+                                children: [createTextInline(newText)] 
+                            }
+                        };
+                        break;
                     case 'blockquote':
-                    case 'listItem': 
-                        updatedBlock.content.children = [createTextInline(newText)]; 
+                         updatedBlock = {
+                            ...originalBlock,
+                            metadata: { ...originalBlock.metadata }, 
+                            content: { 
+                                ...originalBlock.content,
+                                children: [createTextInline(newText)] 
+                            }
+                        };
+                        break;
+                    case 'listItem':
+                        updatedBlock = {
+                            ...originalBlock,
+                            metadata: { ...originalBlock.metadata }, // Préserve depth, ordered, checked, etc.
+                            content: { 
+                                ...originalBlock.content,
+                                children: [createTextInline(newText)] 
+                            }
+                        } as ListItemBlock; // Cast explicite pour aider TS
                         break;
                     case 'code':
-                        updatedBlock.content.code = newText;
+                         updatedBlock = {
+                            ...originalBlock,
+                            metadata: { ...originalBlock.metadata }, 
+                            content: { 
+                                ...originalBlock.content, // Préserve language, etc.
+                                code: newText
+                            }
+                        };
+                        break;
+                    default:
+                        // Ce cas ne devrait pas être atteint à cause du `includes` plus haut
+                        logger.warn(`[useBlocksManagement] Unexpected block type in direct update switch: ${originalBlock.type}`);
                         break;
                 }
-                const updatedBlocks = [...currentBlocks];
-                updatedBlocks[editedBlockIndex] = updatedBlock;
-                logger.debug("[useBlocksManagement] Updated block content directly:", updatedBlock);
-                return updatedBlocks;
+                
+                if (updatedBlock) {
+                  const updatedBlocks = [...currentBlocks];
+                  updatedBlocks[editedBlockIndex] = updatedBlock; // TS devrait être satisfait ici
+                  logger.debug("[useBlocksManagement] Updated block content directly (with metadata preservation):", updatedBlock);
+                  return updatedBlocks;
+                } else {
+                  // Si updatedBlock est resté null (cas default inattendu)
+                  return currentBlocks;
+                }
+
               } catch (error) {
                 logger.error("[useBlocksManagement] Error directly updating block content:", { error, blockId, blockType: originalBlock.type });
                 return currentBlocks;
               }
           } 
-          // >> AJOUTER CE CAS POUR L'IMAGE <<
+          // CAS 4: Image update 
           else if (originalBlock.type === 'image') {
               logger.debug(`[useBlocksManagement] Image update detected for ${blockId}. Parsing new markdown...`);
               try {
@@ -251,7 +296,7 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
                   return currentBlocks;
               }
           }
-          // CAS 4 devient CAS 5: Unhandled types
+          // CAS 5: Unhandled types
           else {
               logger.warn(`[useBlocksManagement] handleBlockContentChange called for unhandled block type: ${originalBlock.type}. No action taken.`);
               return currentBlocks;
@@ -335,32 +380,49 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
         } 
         // --- CAS B: TYPES DE BLOCS STANDARD (Identique à App.tsx) --- 
         else {
+             // << AJOUT: Calcul de l'indentation initiale >>
+             let initialIndentationLevel = 0;
+             // Utiliser targetBlock directement car on a déjà vérifié targetBlockIndex
+             if (targetBlock.type === 'listItem') {
+                 initialIndentationLevel = (targetBlock as ListItemBlock).metadata.depth;
+             } else {
+                 initialIndentationLevel = targetBlock.metadata?.indentationLevel ?? 0;
+             }
+             logger.debug(`[useBlocksManagement] New standard block inheriting indentationLevel: ${initialIndentationLevel}`);
+             // << FIN AJOUT >>
+
             switch (selectedType) {
-                case 'paragraph': newBlock = { id: newId, type: 'paragraph', content: { children: [createTextInline('Nouveau paragraphe')] }, metadata: {} }; break; 
-                case 'heading1': newBlock = { id: newId, type: 'heading', content: { level: 1, children: [createTextInline('Nouveau Titre 1')] }, metadata: {} }; break;
-                case 'heading2': newBlock = { id: newId, type: 'heading', content: { level: 2, children: [createTextInline('Nouveau Titre 2')] }, metadata: {} }; break;
-                case 'code': newBlock = { id: newId, type: 'code', content: { code: '// Votre code ici...', language: 'plaintext' }, metadata: {} }; break;
-                case 'mermaid': newBlock = { id: newId, type: 'mermaid', content: { code: 'graph TD;\n  A-->B;' }, metadata: {} }; break;
+                // << MODIFIÉ: Appliquer initialIndentationLevel >>
+                case 'paragraph': newBlock = { id: newId, type: 'paragraph', content: { children: [createTextInline('Nouveau paragraphe')] }, metadata: { indentationLevel: initialIndentationLevel } }; break; 
+                case 'heading1': newBlock = { id: newId, type: 'heading', content: { level: 1, children: [createTextInline('Nouveau Titre 1')] }, metadata: { indentationLevel: initialIndentationLevel } }; break;
+                case 'heading2': newBlock = { id: newId, type: 'heading', content: { level: 2, children: [createTextInline('Nouveau Titre 2')] }, metadata: { indentationLevel: initialIndentationLevel } }; break;
+                case 'code': newBlock = { id: newId, type: 'code', content: { code: '// Votre code ici...', language: 'plaintext' }, metadata: { indentationLevel: initialIndentationLevel } }; break;
+                case 'mermaid': newBlock = { id: newId, type: 'mermaid', content: { code: 'graph TD;\n  A-->B;' }, metadata: { indentationLevel: initialIndentationLevel } }; break;
                 case 'image': 
-                    // Demander l'URL à l'utilisateur
                     const imageUrl = prompt("Entrez l'URL de l'image :", "https://");
                     if (imageUrl) {
-                        // Créer le bloc uniquement si une URL est fournie
                         newBlock = { 
                             id: newId, 
                             type: 'image', 
-                            content: { src: imageUrl, alt: '', title: undefined }, // Commencer avec alt vide, pas de title
-                            metadata: {} 
+                            content: { src: imageUrl, alt: '', title: undefined }, 
+                            metadata: { indentationLevel: initialIndentationLevel } // << MODIFIÉ
                         }; 
                     } else {
-                        // Remplacer info par debug
                         logger.debug("[useBlocksManagement] Image block creation cancelled by user.");
                     }
                     break;
-                case 'blockquote': newBlock = { id: newId, type: 'blockquote', content: { children: [createTextInline('Nouvelle citation')] }, metadata: {} }; break;
-                case 'table': newBlock = { id: newId, type: 'table', content: { align: ['left', 'left'], rows: [[[{ type: 'text', value: 'Header' }],[{ type: 'text', value: 'Header' }]],[[{ type: 'text', value: 'Cell' }],[{ type: 'text', value: 'Cell' }]]]}, metadata: {} }; break;
-                case 'html': newBlock = { id: newId, type: 'html', content: { html: '<div>Nouveau HTML</div>' }, metadata: {} }; break;
-                case 'thematicBreak': newBlock = { id: newId, type: 'thematicBreak', content: {}, metadata: {} }; break;
+                case 'blockquote': newBlock = { id: newId, type: 'blockquote', content: { children: [createTextInline('Nouvelle citation')] }, metadata: { indentationLevel: initialIndentationLevel } }; break;
+                case 'table': 
+                    const defaultCsvContent = "Header 1,Header 2\nCellule 1A,Cellule 1B\nCellule 2A,Cellule 2B";
+                    newBlock = { 
+                        id: newId, 
+                        type: 'code', 
+                        content: { code: defaultCsvContent, language: 'csv' }, 
+                        metadata: { indentationLevel: initialIndentationLevel } // << MODIFIÉ
+                    }; 
+                    break;
+                case 'html': newBlock = { id: newId, type: 'html', content: { html: '<div>Nouveau HTML</div>' }, metadata: { indentationLevel: initialIndentationLevel } }; break;
+                case 'thematicBreak': newBlock = { id: newId, type: 'thematicBreak', content: {}, metadata: {} }; break; // Pas d'indentation
                 default: logger.warn(`[useBlocksManagement] Unknown or unhandled standard block type selected: ${selectedType}`);
             }
             logger.debug(`[useBlocksManagement] Created new standard block:`, newBlock);

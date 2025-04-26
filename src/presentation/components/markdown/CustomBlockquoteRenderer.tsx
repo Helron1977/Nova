@@ -11,6 +11,8 @@ interface CustomBlockquoteRendererProps {
   style?: React.CSSProperties;
   listIndex?: number;
   index?: number;
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -42,6 +44,8 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   onUpdateBlockContent, 
   listIndex, 
   index, 
+  onIncreaseIndentation,
+  onDecreaseIndentation,
   ...rest 
 }, ref) => {
   const { id, content: { children }, metadata } = block;
@@ -74,6 +78,7 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   }, [isEditing, children, id]);
 
   const handleDoubleClick = () => {
+    logger.debug(`[BlockquoteRenderer ${id}] handleDoubleClick triggered.`);
     if (onUpdateBlockContent) {
       logger.debug(`[BlockquoteRenderer] Double click on quote ${id}. Entering edit mode.`);
       setIsEditing(true);
@@ -83,6 +88,7 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   };
 
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    logger.debug(`[BlockquoteRenderer ${id}] handleChange called. New value:`, event.target.value);
     setEditingText(event.target.value);
   };
 
@@ -101,12 +107,16 @@ const CustomBlockquoteRendererComponent = React.forwardRef<
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    logger.debug(`[BlockquoteRenderer ${id}] handleKeyDown triggered. Key: ${event.key}, Shift: ${event.shiftKey}`);
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSave();
     } else if (event.key === 'Escape') {
       event.preventDefault(); 
       handleCancel();
+    } else if (event.key === 'Tab') {
+        console.log('%c[BlockquoteRenderer %s] Tab pressed during edit.', 'color: darkblue;', id);
     }
   };
 

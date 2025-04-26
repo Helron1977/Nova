@@ -8,6 +8,8 @@ interface CustomHTMLRendererProps {
   onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number;
   index?: number;
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -21,6 +23,8 @@ const CustomHTMLRenderer = React.forwardRef<
   onUpdateBlockContent,
   listIndex,
   index,
+  onIncreaseIndentation,
+  onDecreaseIndentation,
   ...rest 
 }, ref) => {
   const { html } = block.content;

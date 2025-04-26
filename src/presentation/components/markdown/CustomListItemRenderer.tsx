@@ -191,6 +191,9 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
     <div 
       key={id}
       className="list-item-content"
+      // Applique un padding à gauche pour l'indentation visuelle des éléments de liste imbriqués.
+      // Chaque niveau de profondeur (depth) ajoute 1.5rem de padding.
+      style={{ paddingLeft: `${(depth || 0) * 1.5}rem` }}
     >
       {contentWithMarker}
     </div>

@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ImageBlock } from '@/application/logic/markdownParser';
 
+
 interface CustomImageRendererProps {
   block: ImageBlock;
   style?: React.CSSProperties;
   onUpdateBlockContent?: (blockId: string, newMarkdown: string) => void;
   listIndex?: number;
   index?: number;
+  onIncreaseIndentation?: (blockId: string) => void;
+  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -26,6 +29,8 @@ const CustomImageRenderer = React.forwardRef<
   onUpdateBlockContent,
   listIndex,
   index,
+  onIncreaseIndentation,
+  onDecreaseIndentation,
   ...rest 
 }, ref) => {
   const { src, alt, title } = block.content;
@@ -80,6 +85,11 @@ const CustomImageRenderer = React.forwardRef<
           handleSave();
       } else if (event.key === 'Escape') {
           handleCancel();
+      } else if (event.key === 'Tab') {
+          console.log('%c[CustomImageRenderer %s] %s pressed during edit.', 'color: darkblue;', block.id, event.shiftKey ? 'Shift-Tab' : 'Tab');
+          // logger.debug(`[CustomImageRenderer ${block.id}] ${event.shiftKey ? 'Shift-Tab' : 'Tab'} pressed during edit.`);
+          // Le comportement par défaut (changer de focus) est probablement OK ici.
+          // event.preventDefault(); 
       }
   };
 
