@@ -98,6 +98,7 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
   };
 
   const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
     const newCheckedState = event.target.checked;
     logger.debug(`[ListItemRenderer] Checkbox for item ${id} changed to: ${newCheckedState}`);
 
@@ -161,7 +162,8 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
         type="checkbox" 
         checked={checked} 
         onChange={handleCheckboxChange}
-        className="mr-2 align-middle cursor-pointer"
+        onClick={(e) => e.stopPropagation()}
+        className="mr-2 align-middle cursor-pointer mt-1"
       />
     );
   }
@@ -172,18 +174,22 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
   }
 
   contentWithMarker = (
-    <div className="flex items-start">
+    <div className="flex items-center">
       {!checkboxElement && <span className="mr-2 list-marker">{marker}</span>}
       {checkboxElement}
-      <div className="list-item-main-content flex-1">{mainContent}</div>
+      <div 
+        className="list-item-main-content flex-1"
+        onDoubleClick={handleDoubleClick}
+        title="Double-cliquez pour modifier"
+      >
+        {mainContent}
+      </div>
     </div>
   );
 
   return (
     <div 
       key={id}
-      onClick={handleDoubleClick}
-      title="Cliquez pour modifier"
       className="list-item-content"
     >
       {contentWithMarker}

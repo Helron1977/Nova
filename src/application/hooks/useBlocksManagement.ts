@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
-import { markdownToBlocks, Block, InlineElement, TextInline, ListItemBlock, MarkerStyle } from '@/application/logic/markdownParser';
+import { markdownToBlocks, Block, InlineElement, TextInline, ListItemBlock, ImageBlock, MarkerStyle } from '@/application/logic/markdownParser';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
 
 // Initialisation du logger pour ce hook
@@ -225,7 +225,33 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
                 return currentBlocks;
               }
           } 
-          // CAS 4: Unhandled types
+          // >> AJOUTER CE CAS POUR L'IMAGE <<
+          else if (originalBlock.type === 'image') {
+              logger.debug(`[useBlocksManagement] Image update detected for ${blockId}. Parsing new markdown...`);
+              try {
+                  const parsedImageBlocks = markdownToBlocks(newText); // newText est ![alt](src "title")
+                  if (parsedImageBlocks.length === 1 && parsedImageBlocks[0].type === 'image') {
+                      const parsedImageBlock = parsedImageBlocks[0] as ImageBlock;
+                      // Créer le bloc mis à jour en gardant l'ID et les métadonnées d'origine,
+                      // mais en utilisant le nouveau contenu parsé.
+                      const updatedBlock = {
+                          ...originalBlock, // Garde id, type, metadata
+                          content: parsedImageBlock.content // Prend la nouvelle src, alt, title
+                      };
+                      const updatedBlocks = [...currentBlocks];
+                      updatedBlocks[editedBlockIndex] = updatedBlock;
+                      logger.debug("[useBlocksManagement] Updated image block content via parsing:", updatedBlock);
+                      return updatedBlocks;
+                  } else {
+                      logger.error("[useBlocksManagement] Failed to parse updated image markdown correctly.", { newText, parsedResult: parsedImageBlocks });
+                      return currentBlocks;
+                  }
+              } catch (error) {
+                  logger.error("[useBlocksManagement] Error parsing updated image markdown:", { error, blockId, newText });
+                  return currentBlocks;
+              }
+          }
+          // CAS 4 devient CAS 5: Unhandled types
           else {
               logger.warn(`[useBlocksManagement] handleBlockContentChange called for unhandled block type: ${originalBlock.type}. No action taken.`);
               return currentBlocks;
@@ -315,7 +341,22 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
                 case 'heading2': newBlock = { id: newId, type: 'heading', content: { level: 2, children: [createTextInline('Nouveau Titre 2')] }, metadata: {} }; break;
                 case 'code': newBlock = { id: newId, type: 'code', content: { code: '// Votre code ici...', language: 'plaintext' }, metadata: {} }; break;
                 case 'mermaid': newBlock = { id: newId, type: 'mermaid', content: { code: 'graph TD;\n  A-->B;' }, metadata: {} }; break;
-                case 'image': newBlock = { id: newId, type: 'image', content: { src: 'https://via.placeholder.com/150', alt: 'Nouvelle image' }, metadata: {} }; break;
+                case 'image': 
+                    // Demander l'URL à l'utilisateur
+                    const imageUrl = prompt("Entrez l'URL de l'image :", "https://");
+                    if (imageUrl) {
+                        // Créer le bloc uniquement si une URL est fournie
+                        newBlock = { 
+                            id: newId, 
+                            type: 'image', 
+                            content: { src: imageUrl, alt: '', title: undefined }, // Commencer avec alt vide, pas de title
+                            metadata: {} 
+                        }; 
+                    } else {
+                        // Remplacer info par debug
+                        logger.debug("[useBlocksManagement] Image block creation cancelled by user.");
+                    }
+                    break;
                 case 'blockquote': newBlock = { id: newId, type: 'blockquote', content: { children: [createTextInline('Nouvelle citation')] }, metadata: {} }; break;
                 case 'table': newBlock = { id: newId, type: 'table', content: { align: ['left', 'left'], rows: [[[{ type: 'text', value: 'Header' }],[{ type: 'text', value: 'Header' }]],[[{ type: 'text', value: 'Cell' }],[{ type: 'text', value: 'Cell' }]]]}, metadata: {} }; break;
                 case 'html': newBlock = { id: newId, type: 'html', content: { html: '<div>Nouveau HTML</div>' }, metadata: {} }; break;
@@ -332,8 +373,8 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
             updatedBlocks.splice(insertIndex, 0, newBlock);
             return updatedBlocks;
         } else {
-            logger.error(`[useBlocksManagement] Failed to create new block for insertion.`);
-            return currentBlocks; // Retourner l'état précédent en cas d'échec
+            logger.debug("[useBlocksManagement] No new block created (newBlock is null), skipping insertion.");
+            return currentBlocks;
         }
     });
   }, []); // Dépend de setBlocks implicitement
