@@ -14,6 +14,9 @@ import { PinoLogger } from './infrastructure/logging/PinoLogger';
 
 // RÉ-IMPORTER le serializer
 import { blocksToMarkdown } from './application/logic/markdownSerializer';
+// --- AJOUT: Importer le hook ---
+import { useBlocksManagement } from './application/hooks/useBlocksManagement';
+
 
 // Définition unique de sampleMarkdown...
 const sampleMarkdown = `# Titre Principal
@@ -73,28 +76,66 @@ function App() {
   const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
+  // --- MODIFIÉ: Utilisation du hook useBlocksManagement ---
+  // 1. Parser le markdown initial une seule fois
+  const initialSampleBlocks = useMemo(() => {
+    logger.debug('[App] Parsing initial sample markdown...');
+    return markdownToBlocks(sampleMarkdown);
+  }, []); // Pas de dépendances, exécuté une seule fois
+
+  // 2. Initialiser le hook avec les blocs initiaux
+  const {
+    blocks, // <- L'état des blocs vient maintenant du hook
+    setExternalBlocks, // <- Fonction pour mettre à jour les blocs (ex: chargement)
+    handleDragEnd,
+    handleDeleteBlock,
+    handleBlockContentChange,
+    handleAddBlockAfter,
+    handleIncreaseIndentation,
+    handleDecreaseIndentation,
+  } = useBlocksManagement(initialSampleBlocks);
+
+  // --- SUPPRIMÉ: Ancien état et callback ---
+  // const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown); // Supprimé
+  // const [editorBlocks, setEditorBlocks] = useState<Block[]>([]); // Supprimé, remplacé par `blocks` du hook
+  /*
   const handleEditorChange = useCallback((newMarkdown: string, newBlocks: Block[]) => {
     logger.debug('[App] Editor content changed via callback');
-    setEditorBlocks(newBlocks);
+    // setEditorBlocks(newBlocks); // Supprimé
     setHasUnsavedChanges(true);
-    // console.log("Nouveaux Blocks (état App):", newBlocks); // Garder pour debug si besoin
-  }, []);
+    // console.log("Nouveaux Blocks (état App):", newBlocks);
+  }, []); // Supprimé
+  */
+
+  // --- AJOUT: Surveiller les changements de blocs pour marquer comme non sauvegardé ---
+  useEffect(() => {
+    // On compare avec les blocs initiaux pour ne pas marquer comme modifié au chargement initial
+    // C'est une comparaison simple par référence, peut ne pas détecter toutes les modifs internes si le hook mute.
+    // Si useBlocksManagement retourne toujours une nouvelle référence de tableau, cela fonctionnera.
+    // Une comparaison profonde serait plus robuste mais plus coûteuse.
+    if (blocks !== initialSampleBlocks) {
+        logger.debug('[App] Block state changed (detected by reference change), marking as unsaved.');
+        setHasUnsavedChanges(true);
+    }
+    // On pourrait aussi ajouter un callback `onBlocksChange` au hook si nécessaire pour une détection plus fine.
+  }, [blocks, initialSampleBlocks]);
+
 
   const triggerSave = useCallback(() => {
+    // Modifié: Utilise directement `blocks` du hook
     if (!hasUnsavedChanges) {
         logger.debug('[App] Pas de changements non sauvegardés à enregistrer.');
         return;
     }
 
     logger.debug('[App] Déclenchement sauvegarde (Ctrl+S)...');
-
-    if (editorBlocks.length === 0) {
+    if (blocks.length === 0) { // Utilise `blocks` du hook
         logger.warn('[App] Tentative de sauvegarde avec des blocs vides. Annulation.');
         return;
     }
 
     try {
-        const markdownToSave = blocksToMarkdown(editorBlocks);
+        const markdownToSave = blocksToMarkdown(blocks); // Utilise `blocks` du hook
         logger.debug('[App] Markdown sérialisé pour sauvegarde.');
         
         // AJOUT: Demander le nom du fichier à l'utilisateur
@@ -103,13 +144,13 @@ function App() {
         // Vérifier si l'utilisateur a annulé
         if (fileName === null) { 
             logger.debug('[App] Sauvegarde annulée par l\'utilisateur.');
-            return; // Arrêter le processus de sauvegarde
+            return;
         }
 
         // S'assurer que le nom n'est pas vide et a l'extension .md
         fileName = fileName.trim();
         if (!fileName) {
-            fileName = "document.md"; // Utiliser le défaut si vide après trim
+            fileName = "document.md";
         }
         if (!fileName.toLowerCase().endsWith('.md')) {
             fileName += '.md';
@@ -128,15 +169,14 @@ function App() {
         URL.revokeObjectURL(url);
         
         logger.debug(`[App] Fichier Markdown '${fileName}' demandé au téléchargement.`);
-        setHasUnsavedChanges(false);
-
+        setHasUnsavedChanges(false); // Marquer comme sauvegardé
     } catch (error) {
         logger.error('[App] Erreur lors de la sérialisation ou du déclenchement du téléchargement:', error);
         // Afficher une erreur à l'utilisateur si nécessaire
         alert("Une erreur s'est produite lors de la tentative de sauvegarde.");
     }
-
-  }, [editorBlocks, hasUnsavedChanges]);
+  // --- MODIFIÉ: Dépend de `blocks` du hook et `hasUnsavedChanges` ---
+  }, [blocks, hasUnsavedChanges]);
 
   // AJOUT: Fonction pour charger le contenu Markdown
   const handleLoadMarkdown = useCallback((markdownContent: string) => {
@@ -172,9 +212,9 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-        event.preventDefault(); // Empêcher l'action native du navigateur
+        event.preventDefault();
         logger.debug('[App] Ctrl+S détecté !');
-        triggerSave(); // Appeler notre logique de sauvegarde
+        triggerSave(); // Appeler notre logique de sauvegarde (qui dépend maintenant de `blocks`)
       }
     };
 
@@ -185,21 +225,24 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
       logger.debug('[App] Écouteur keydown pour Ctrl+S retiré.');
     };
-  }, [triggerSave]);
+  }, [triggerSave]); // triggerSave dépend maintenant de `blocks`
 
   return (
     <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200`}>
       <Header onLoadMarkdown={handleLoadMarkdown} />
       <MainContent>
         <div className="prose dark:prose-invert max-w-4xl mx-auto pb-96 bg-white dark:bg-gray-800 rounded-md shadow-md">
+          {/* --- MODIFIÉ: Passage des props à NovaEditor --- */}
           <NovaEditor
-            blocks={editorBlocks}
-            onDragEnd={handleEditorChange}
-            onDeleteBlock={handleEditorChange}
-            onBlockContentChange={handleEditorChange}
-            onAddBlockAfter={handleEditorChange}
-            onIncreaseIndentation={handleEditorChange}
-            onDecreaseIndentation={handleEditorChange}
+            blocks={blocks} // <- Passe les blocs du hook
+            // Passe toutes les fonctions de manipulation du hook
+            onDragEnd={handleDragEnd}
+            onDeleteBlock={handleDeleteBlock}
+            onBlockContentChange={handleBlockContentChange}
+            onAddBlockAfter={handleAddBlockAfter}
+            onIncreaseIndentation={handleIncreaseIndentation}
+            onDecreaseIndentation={handleDecreaseIndentation}
+            // Supprime initialMarkdown et onChange
           />
         </div>
       </MainContent>
