@@ -32,7 +32,6 @@ const BlockTypeSelector: React.FC<BlockTypeSelectorProps> = ({ position, onSelec
   };
 
   const radius = 80;
-  const centerOffset = 16;
   const totalItems = blockTypes.length;
   const angleStep = (2 * Math.PI) / totalItems;
 

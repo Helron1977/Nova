@@ -7,7 +7,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { keymap, EditorView } from '@codemirror/view';
 import { history, historyKeymap,  insertNewline } from '@codemirror/commands';
-import { Prec, EditorState, ChangeSpec } from '@codemirror/state';
+import { Prec, ChangeSpec } from '@codemirror/state';
 
 // Instancier le logger au niveau du module
 const logger = new PinoLogger();
@@ -260,7 +260,7 @@ const CustomParagraphRendererComponent = React.forwardRef<
 
   }, [id]);
 
-  const handleCreateEditor = useCallback((view: EditorView, state: EditorState) => {
+  const handleCreateEditor = useCallback((view: EditorView) => {
     viewRef.current = view;
   }, []);
 

@@ -68,15 +68,12 @@ const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
 // Fonction principale pour sérialiser les blocs
 export const blocksToMarkdown = (blocks: Block[]): string => {
     let markdownOutput = '';
-    let previousBlockType: string | null = null;
     let currentListNumber = 1; // Pour suivre la numérotation des listes ordonnées
     let previousListDepth = -1;
     let previousListOrdered = false;
 
     blocks.forEach((block, index) => {
         let blockMarkdown = '';
-        let needsExtraNewline = true; // Par défaut, on ajoute un double saut de ligne
-        let isListItem = false;
         let indent = '';
         if (block.type === 'listItem') {
             // Indentation des listes basée sur leur depth
@@ -90,7 +87,6 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
             case 'heading':
                 const heading = block as HeadingBlock;
                 blockMarkdown = `${indent}${'#'.repeat(heading.content.level)} ${renderInlineElementsToMarkdown(heading.content.children)}`;
-                needsExtraNewline = true;
                 break;
 
             case 'paragraph':
@@ -99,9 +95,6 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
 
             case 'listItem':
                 const listItem = block as ListItemBlock;
-                // L'indentation a été calculée au début et stockée dans `indent`
-                isListItem = true; // Marquer comme listItem pour la gestion des sauts de ligne
-
                 // Logique pour déterminer le marqueur (-, 1., etc.) et le préfixe de tâche
                 let marker: string;
                 if (listItem.metadata.ordered) {
@@ -132,24 +125,20 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                 const lang = codeBlock.content.language || '';
                 const codeLines = codeBlock.content.code.split('\n');
                 blockMarkdown = `${indent}\`\`\`${lang}\n${codeLines.map(line => indent + line).join('\n')}\n${indent}\`\`\``;
-                needsExtraNewline = true;
                 break;
 
             case 'blockquote':
                 const quoteContent = renderInlineElementsToMarkdown((block as BlockquoteBlock).content.children);
                 blockMarkdown = quoteContent.split('\n').map(line => `${indent}> ${line}`).join('\n');
-                needsExtraNewline = true;
                 break;
 
             case 'thematicBreak':
                 blockMarkdown = `${indent}***`;
-                needsExtraNewline = true;
                 break;
 
             case 'html':
                 const htmlLines = (block as HTMLBlock).content.html.split('\n');
                 blockMarkdown = htmlLines.map(line => indent + line).join('\n');
-                needsExtraNewline = true;
                 break;
                 
             case 'image':
@@ -157,14 +146,12 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                  const alt = imageBlock.content.alt || '';
                  const title = imageBlock.content.title ? ` "${imageBlock.content.title}"` : '';
                  blockMarkdown = `${indent}![${alt}](${imageBlock.content.src}${title})`;
-                 needsExtraNewline = true;
                  break;
            
              case 'mermaid':
                  const mermaidBlock = block as MermaidBlock;
                  const mermaidLines = mermaidBlock.content.code.split('\n');
                  blockMarkdown = `${indent}\`\`\`mermaid\n${mermaidLines.map(line => indent + line).join('\n')}\n${indent}\`\`\``;
-                 needsExtraNewline = true;
                  break;
 
             case 'table':
@@ -195,7 +182,6 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                 }
 
                 blockMarkdown = `${headerRowMd}\n${separatorRowMd}${rows.length > 1 ? '\n' + bodyRowsMd : ''}`;
-                needsExtraNewline = true;
                  // Réinitialiser l'état de la liste après une table
                  previousListDepth = -1;
                  previousListOrdered = false;
@@ -204,7 +190,6 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
             default:
                 logger.warn(`[blocksToMarkdown] Unhandled block type: ${(block as any)?.type}`, { block });
                 blockMarkdown = `${indent}<!-- Unhandled block type: ${(block as any)?.type} -->`;
-                needsExtraNewline = true;
                 // Réinitialiser l'état de la liste après un bloc inconnu
                 previousListDepth = -1;
                 previousListOrdered = false;
@@ -233,7 +218,6 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
         }
 
         markdownOutput += blockMarkdown;
-        previousBlockType = block.type; // Garder previousBlockType peut être utile ailleurs
     });
 
     return markdownOutput.trim(); 

@@ -148,7 +148,7 @@ const VerticalActionMenu: React.FC<VerticalActionMenuProps> = ({
             onMouseLeave={startCloseTimer}
         >
             <div className="flex flex-col items-center space-y-1">
-                {actions.map((action, index) => {
+                {actions.map((action, _ ) => {
                     const baseClasses = "w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full border transition-all duration-150 ease-in-out";
                     const interactiveClasses = "opacity-60 hover:opacity-100 cursor-pointer";
                     const colorClasses = "bg-slate-100 dark:bg-slate-700 border-gray-300 dark:border-gray-500 text-gray-600 dark:text-gray-300";

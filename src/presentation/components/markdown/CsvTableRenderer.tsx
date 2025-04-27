@@ -17,7 +17,7 @@ interface CsvTableRendererProps {
 
 // Fonction pour parser le CSV et rendre une table HTML simple
 // Adapté de legacy_code/utils/test-csv.html
-const parseCsvAndRenderTable = (csvContent: string | undefined, theme?: string): { headers: string[], rows: string[][] } | null => {
+const parseCsvAndRenderTable = (csvContent: string | undefined): { headers: string[], rows: string[][] } | null => {
     if (!csvContent) return null;
     try {
         const lines = csvContent.trim().split(/\r?\n/); // Gérer \n et \r\n
@@ -76,7 +76,7 @@ const CsvTableRenderer = React.forwardRef<
   const theme = language?.startsWith('csv-') ? language.substring(4) : '';
 
   // Parse CSV data for rendering
-  const tableData = useMemo(() => parseCsvAndRenderTable(csvContent, theme), [csvContent, theme]);
+  const tableData = useMemo(() => parseCsvAndRenderTable(csvContent), [csvContent]);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {

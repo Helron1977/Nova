@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, {useRef } from 'react';
 // Supprimer tous les imports CodeMirror
 // import { EditorState, ChangeSpec } from '@codemirror/state';
 // import { EditorView, keymap } from '@codemirror/view';

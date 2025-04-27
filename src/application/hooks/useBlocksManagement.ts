@@ -1,8 +1,8 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
-import { markdownToBlocks, Block, InlineElement, TextInline, ListItemBlock, ImageBlock, MarkerStyle } from '@/application/logic/markdownParser';
+import { markdownToBlocks, Block, TextInline, ListItemBlock, ImageBlock, MarkerStyle } from '@/application/logic/markdownParser';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
 
 // Initialisation du logger pour ce hook

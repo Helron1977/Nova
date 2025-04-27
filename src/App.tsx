@@ -4,7 +4,7 @@ import MainContent from './presentation/components/layout/MainContent';
 import Footer from './presentation/components/layout/Footer';
 import { useUiStore } from './application/state/uiStore';
 import mermaid from 'mermaid';
-import { Block, markdownToBlocks } from './application/logic/markdownParser';
+import {markdownToBlocks } from './application/logic/markdownParser';
 
 // Importer le nouveau composant éditeur
 import { NovaEditor } from './presentation/components/editor/NovaEditor';
@@ -71,9 +71,10 @@ const logger = new PinoLogger();
 
 function App() {
   const theme = useUiStore((state) => state.theme);
-  
-  const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown);
-  const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
+
+  // --- SUPPRIMÉ: États obsolètes ---
+  // const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown);
+  // const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
   // --- MODIFIÉ: Utilisation du hook useBlocksManagement ---
@@ -95,16 +96,9 @@ function App() {
     handleDecreaseIndentation,
   } = useBlocksManagement(initialSampleBlocks);
 
-  // --- SUPPRIMÉ: Ancien état et callback ---
-  // const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown); // Supprimé
-  // const [editorBlocks, setEditorBlocks] = useState<Block[]>([]); // Supprimé, remplacé par `blocks` du hook
+  // --- SUPPRIMÉ: Bloc commenté obsolète ---
   /*
-  const handleEditorChange = useCallback((newMarkdown: string, newBlocks: Block[]) => {
-    logger.debug('[App] Editor content changed via callback');
-    // setEditorBlocks(newBlocks); // Supprimé
-    setHasUnsavedChanges(true);
-    // console.log("Nouveaux Blocks (état App):", newBlocks);
-  }, []); // Supprimé
+  const handleEditorChange = useCallback((newMarkdown: string, newBlocks: Block[]) => { ... }, []);
   */
 
   // --- AJOUT: Surveiller les changements de blocs pour marquer comme non sauvegardé ---
@@ -137,12 +131,12 @@ function App() {
     try {
         const markdownToSave = blocksToMarkdown(blocks); // Utilise `blocks` du hook
         logger.debug('[App] Markdown sérialisé pour sauvegarde.');
-        
+
         // AJOUT: Demander le nom du fichier à l'utilisateur
         let fileName = prompt("Entrez le nom du fichier pour la sauvegarde :", "document.md");
 
         // Vérifier si l'utilisateur a annulé
-        if (fileName === null) { 
+        if (fileName === null) {
             logger.debug('[App] Sauvegarde annulée par l\'utilisateur.');
             return;
         }
@@ -156,18 +150,18 @@ function App() {
             fileName += '.md';
         }
         // FIN AJOUT
-        
+
         const blob = new Blob([markdownToSave], { type: 'text/markdown;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         // MODIFIÉ: Utiliser le nom de fichier choisi
-        link.download = fileName; 
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         logger.debug(`[App] Fichier Markdown '${fileName}' demandé au téléchargement.`);
         setHasUnsavedChanges(false); // Marquer comme sauvegardé
     } catch (error) {
@@ -178,22 +172,26 @@ function App() {
   // --- MODIFIÉ: Dépend de `blocks` du hook et `hasUnsavedChanges` ---
   }, [blocks, hasUnsavedChanges]);
 
-  // AJOUT: Fonction pour charger le contenu Markdown
+  // AJOUT: Fonction pour charger le contenu Markdown (nettoyée)
   const handleLoadMarkdown = useCallback((markdownContent: string) => {
       try {
           logger.debug('[App] Chargement de nouveau contenu Markdown...');
           const newBlocks = markdownToBlocks(markdownContent);
-          setEditorMarkdown(markdownContent); // Mettre à jour le markdown brut (si utilisé)
-          setEditorBlocks(newBlocks);        // Mettre à jour les blocs parsés
-          setHasUnsavedChanges(false);     // Considérer comme "non modifié" initialement
-          logger.debug('[App] Contenu chargé et blocs mis à jour.');
-          // TODO: Informer NovaEditor qu'il doit utiliser ces nouveaux blocs.
-          // Cela pourrait nécessiter de passer editorBlocks comme prop à NovaEditor.
+
+          // --- AJOUT DU LOG DE DIAGNOSTIC ---
+          console.log("--- Blocs Parsés ---");
+          console.log(JSON.stringify(newBlocks, null, 2)); // Affiche la structure détaillée
+          logger.debug('[App] Blocs parsés depuis le fichier chargé:', newBlocks);
+          // --- FIN DU LOG ---
+
+          setExternalBlocks(newBlocks);
+          setHasUnsavedChanges(false);
+          logger.debug('[App] Contenu chargé et blocs mis à jour via le hook.');
       } catch (error) {
           logger.error('[App] Erreur lors du parsing du Markdown chargé:', error);
           alert("Erreur lors du chargement ou du parsing du fichier Markdown.");
       }
-  }, []); // Dépend de setEditorMarkdown, setEditorBlocks, setHasUnsavedChanges
+  }, [setExternalBlocks]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -202,8 +200,8 @@ function App() {
     } else {
       root.classList.remove('dark');
     }
-    mermaid.initialize({ 
-      startOnLoad: false, 
+    mermaid.initialize({
+      startOnLoad: false,
       theme: 'base',
     });
     logger.debug('[App] Mermaid initialized globally.');

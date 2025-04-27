@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Block, ListItemBlock, CodeBlock } from '@/application/logic/markdownParser';
@@ -7,7 +7,7 @@ import { markdownComponentsConfig } from '@/presentation/config/markdownComponen
 import { GripVertical, Trash2, Plus, ArrowRightFromLine, CornerDownRight, List, ListOrdered, VenetianMask, ListPlus } from 'lucide-react';
 import { Pilcrow, Heading1, Heading2, SquareCode, GitGraph, Image, Quote, Table, Codepen, Minus } from 'lucide-react';
 import CsvTableRenderer from '../markdown/CsvTableRenderer';
-import VerticalActionMenu, { ActionMenuItem as VerticalActionMenuItemType } from '../common/VerticalActionMenu';
+import VerticalActionMenu from '../common/VerticalActionMenu';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
 const logger = new PinoLogger();
 

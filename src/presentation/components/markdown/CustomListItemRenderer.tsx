@@ -30,17 +30,6 @@ const getRawTextFromChildren = (children: InlineElement[] | undefined): string =
   }).join('');
 };
 
-const buildListPrefix = (block: ListItemBlock): string => {
-  const indentation = '  '.repeat(block.metadata.depth || 0);
-  const marker = block.metadata.ordered ? '1. ' : '- ';
-  let checkbox = '';
-  if (block.metadata.checked === true) {
-    checkbox = '[x] ';
-  } else if (block.metadata.checked === false) {
-    checkbox = '[ ] ';
-  }
-  return `${indentation}${marker}${checkbox}`;
-};
 
 const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, onUpdateBlockContent, listIndex }) => {
   const { id, content: { children }, metadata } = block;
