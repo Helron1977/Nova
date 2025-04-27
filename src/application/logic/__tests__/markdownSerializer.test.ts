@@ -53,7 +53,7 @@ describe('Markdown Serialization (blocksToMarkdown)', () => {
         // une fois que le sérialiseur est corrigé.
         console.log("--- Serialized Output for sampleMarkdown ---");
         console.log(serializedMarkdown);
-        // expect(serializedMarkdown.trim()).toBe("EXPECTED_MARKDOWN_OUTPUT"); // Test échouera
+        // expect(serializedMarkdown.trim()).toBe(\"EXPECTED_MARKDOWN_OUTPUT\"); // Test échouera
         expect(serializedMarkdown.trim()).toBe(""); // Forcer l\'échec pour voir la sortie
     });
 

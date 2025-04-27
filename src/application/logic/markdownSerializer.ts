@@ -29,9 +29,10 @@ const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
     elements.forEach(element => {
         switch (element.type) {
             case 'text':
-                // TODO: Échapper les caractères spéciaux Markdown si nécessaire ?
-                // Pour l'instant, ajout direct.
-                markdownString += (element as TextInline).value;
+                // Remplacer les \n littéraux par de vrais sauts de ligne
+                // Utiliser replace avec regex globale pour compatibilité
+                const textValue = (element as TextInline).value.replace(/\\n/g, '\n'); // Correction ici
+                markdownString += textValue;
                 break;
             case 'strong':
                 markdownString += `**${renderInlineElementsToMarkdown((element as StrongInline).children)}**`;
@@ -46,7 +47,8 @@ const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
                 const link = element as LinkInline;
                 const linkText = renderInlineElementsToMarkdown(link.children);
                 const titlePart = link.title ? ` "${link.title}"` : '';
-                markdownString += `[${linkText}](${link.url}${titlePart})`;
+                // *** CORRECTION CLÉ : Utiliser link.url directement ***
+                markdownString += `[${linkText}](${link.url}${titlePart})`; 
                 break;
             case 'delete':
                 markdownString += `~~${renderInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
@@ -57,7 +59,6 @@ const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
                 break;
             default:
                 logger.warn(`[renderInlineElementsToMarkdown] Unhandled inline element type: ${(element as any)?.type}`, { element });
-                // Tentative de fallback ? Pour l'instant, on ignore.
                 break;
         }
     });
@@ -146,6 +147,7 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                  const imageBlock = block as ImageBlock;
                  const alt = imageBlock.content.alt || '';
                  const title = imageBlock.content.title ? ` "${imageBlock.content.title}"` : '';
+                 // *** CORRECTION CLÉ : Utiliser imageBlock.content.src directement ***
                  blockMarkdown = `${indent}![${alt}](${imageBlock.content.src}${title})`;
                  break;
            
@@ -176,15 +178,24 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                         }
                     }).join('|')}|`;
 
-                    // Corps
+                    // Corps - Générer chaque ligne SANS indentation ici
                     bodyRowsMd = rows.slice(1).map(row => 
-                        // Ajouter l'indentation à chaque ligne du corps
-                        `${indent}| ${row.map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`
+                        `| ${row.map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`
                     ).join('\n');
                 }
 
-                // Ajouter l'indentation aux lignes d'en-tête et de séparation
-                blockMarkdown = `${indent}${headerRowMd}\n${indent}${separatorRowMd}${rows.length > 1 ? '\n' + bodyRowsMd : ''}`;
+                // Construire le markdown final en ajoutant l'indentation à CHAQUE ligne
+                const tableLines: string[] = [];
+                if (headerRowMd) {
+                    tableLines.push(`${indent}${headerRowMd}`);       // Indenter l'en-tête
+                    tableLines.push(`${indent}${separatorRowMd}`);    // Indenter le séparateur
+                    if (bodyRowsMd) {
+                        // Indenter chaque ligne du corps
+                        tableLines.push(...bodyRowsMd.split('\n').map(line => `${indent}${line}`)); 
+                    }
+                }
+                blockMarkdown = tableLines.join('\n'); // Joindre les lignes indentées
+
                  // Réinitialiser l'état de la liste après une table
                  previousListDepth = -1;
                  previousListOrdered = false;
