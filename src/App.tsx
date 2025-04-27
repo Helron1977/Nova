@@ -4,7 +4,7 @@ import MainContent from './presentation/components/layout/MainContent';
 import Footer from './presentation/components/layout/Footer';
 import { useUiStore } from './application/state/uiStore';
 import mermaid from 'mermaid';
-import { Block } from './application/logic/markdownParser';
+import { Block, markdownToBlocks } from './application/logic/markdownParser';
 
 // Importer le nouveau composant éditeur
 import { NovaEditor } from './presentation/components/editor/NovaEditor';
@@ -94,15 +94,14 @@ function App() {
     }
 
     try {
-        // Sérialiser les blocs en Markdown
         const markdownToSave = blocksToMarkdown(editorBlocks);
         logger.debug('[App] Markdown sérialisé pour sauvegarde.');
-
+        
         // AJOUT: Demander le nom du fichier à l'utilisateur
         let fileName = prompt("Entrez le nom du fichier pour la sauvegarde :", "document.md");
 
         // Vérifier si l'utilisateur a annulé
-        if (fileName === null) {
+        if (fileName === null) { 
             logger.debug('[App] Sauvegarde annulée par l\'utilisateur.');
             return; // Arrêter le processus de sauvegarde
         }
@@ -116,21 +115,20 @@ function App() {
             fileName += '.md';
         }
         // FIN AJOUT
-
+        
         const blob = new Blob([markdownToSave], { type: 'text/markdown;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         // MODIFIÉ: Utiliser le nom de fichier choisi
-        link.download = fileName;
-        document.body.appendChild(link); // Nécessaire pour Firefox
+        link.download = fileName; 
+        document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url); // Libérer l'URL objet
-
-        // MODIFIÉ: Mettre à jour le message de log
+        URL.revokeObjectURL(url);
+        
         logger.debug(`[App] Fichier Markdown '${fileName}' demandé au téléchargement.`);
-        setHasUnsavedChanges(false); // Marquer comme sauvegardé
+        setHasUnsavedChanges(false);
 
     } catch (error) {
         logger.error('[App] Erreur lors de la sérialisation ou du déclenchement du téléchargement:', error);
@@ -139,6 +137,23 @@ function App() {
     }
 
   }, [editorBlocks, hasUnsavedChanges]);
+
+  // AJOUT: Fonction pour charger le contenu Markdown
+  const handleLoadMarkdown = useCallback((markdownContent: string) => {
+      try {
+          logger.debug('[App] Chargement de nouveau contenu Markdown...');
+          const newBlocks = markdownToBlocks(markdownContent);
+          setEditorMarkdown(markdownContent); // Mettre à jour le markdown brut (si utilisé)
+          setEditorBlocks(newBlocks);        // Mettre à jour les blocs parsés
+          setHasUnsavedChanges(false);     // Considérer comme "non modifié" initialement
+          logger.debug('[App] Contenu chargé et blocs mis à jour.');
+          // TODO: Informer NovaEditor qu'il doit utiliser ces nouveaux blocs.
+          // Cela pourrait nécessiter de passer editorBlocks comme prop à NovaEditor.
+      } catch (error) {
+          logger.error('[App] Erreur lors du parsing du Markdown chargé:', error);
+          alert("Erreur lors du chargement ou du parsing du fichier Markdown.");
+      }
+  }, []); // Dépend de setEditorMarkdown, setEditorBlocks, setHasUnsavedChanges
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -174,12 +189,17 @@ function App() {
 
   return (
     <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200`}>
-      <Header />
+      <Header onLoadMarkdown={handleLoadMarkdown} />
       <MainContent>
         <div className="prose dark:prose-invert max-w-4xl mx-auto pb-96 bg-white dark:bg-gray-800 rounded-md shadow-md">
-          <NovaEditor 
-            initialMarkdown={sampleMarkdown} 
-            onChange={handleEditorChange}
+          <NovaEditor
+            blocks={editorBlocks}
+            onDragEnd={handleEditorChange}
+            onDeleteBlock={handleEditorChange}
+            onBlockContentChange={handleEditorChange}
+            onAddBlockAfter={handleEditorChange}
+            onIncreaseIndentation={handleEditorChange}
+            onDecreaseIndentation={handleEditorChange}
           />
         </div>
       </MainContent>

@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useUiStore } from '../../../application/state/uiStore';
 import { useAuthStore } from '../../../application/state/authStore';
 
-const Header: React.FC = () => {
+// AJOUT: Interface pour les props
+interface HeaderProps {
+  onLoadMarkdown: (content: string) => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onLoadMarkdown }) => {
   // Lire le thème et l'action depuis le store UI
   const { theme, toggleTheme, appMode, setAppMode } = useUiStore(); // Ajouter appMode et setAppMode
   // Lire l'état et les actions d'authentification
   const { user, isLoading, error, signInWithGoogle, logout } = useAuthStore();
+  const fileInputRef = useRef<HTMLInputElement>(null); // AJOUT: Ref pour l'input fichier
 
   const renderAuthSection = () => {
     if (isLoading) {
@@ -43,6 +49,39 @@ const Header: React.FC = () => {
     }
   };
 
+  // AJOUT: Gestionnaire pour le changement de l'input fichier
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (content !== null && content !== undefined) {
+        onLoadMarkdown(content);
+      }
+      // Réinitialiser l'input pour pouvoir recharger le même fichier
+      if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+      }
+    };
+    reader.onerror = (e) => {
+        console.error("Erreur de lecture du fichier", e);
+        alert("Erreur lors de la lecture du fichier.");
+         if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+         }
+    }
+    reader.readAsText(file);
+  };
+
+  // AJOUT: Gestionnaire pour le clic sur le bouton "Charger"
+  const handleLoadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   // TODO: Implémenter la logique pour toggleAdminMode, toggleDarkMode, et ouvrir la modale d'aide
   // Ces fonctions dépendront probablement d'un gestionnaire d'état global.
 
@@ -57,6 +96,23 @@ const Header: React.FC = () => {
 
       {/* Actions Header */}
       <div className="flex items-center">
+        {/* AJOUT: Bouton Charger Fichier */}
+        <button 
+          onClick={handleLoadClick}
+          className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-3 rounded-full transition-colors duration-200 mr-3"
+          title="Charger un fichier Markdown (.md)"
+        >
+           Charger
+        </button>
+        {/* AJOUT: Input fichier caché */}
+        <input 
+           type="file"
+           ref={fileInputRef}
+           onChange={handleFileChange}
+           accept=".md, .markdown"
+           style={{ display: 'none' }} 
+        />
+        
         {/* Section Authentification */} 
         {renderAuthSection()}
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -14,6 +14,7 @@ const createTextInline = (text: string): TextInline => ({ type: 'text', value: t
 // Interface pour les valeurs de retour du hook
 interface UseBlocksManagementReturn {
   blocks: Block[];
+  setExternalBlocks: (newBlocks: Block[]) => void;
   handleDragEnd: (event: DragEndEvent) => void;
   handleDeleteBlock: (idToDelete: string) => void;
   handleBlockContentChange: (blockId: string, newText: string) => void;
@@ -24,17 +25,18 @@ interface UseBlocksManagementReturn {
 
 /**
  * Hook personnalisé pour gérer l'état et la logique des blocs Markdown.
- * @param initialMarkdown Le contenu Markdown initial pour peupler les blocs.
+ * @param initialBlocks Le tableau de blocs initial pour peupler l'état.
  * @returns Un objet contenant l'état des blocs et les fonctions pour les manipuler.
  */
-export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagementReturn => {
-  // État des blocs
-  const initialBlocks = useMemo(() => {
-      logger.debug('[useBlocksManagement] Initializing blocks from markdown...');
-      // Revenir à l'appel direct sans try/catch ni logs supplémentaires ici
-      return markdownToBlocks(initialMarkdown);
-  }, [initialMarkdown]);
+export const useBlocksManagement = (initialBlocks: Block[]): UseBlocksManagementReturn => {
+  // État des blocs, initialisé directement
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+
+  // --- AJOUT: Fonction pour mettre à jour depuis l'extérieur ---
+  const setExternalBlocks = useCallback((newBlocks: Block[]) => {
+      logger.debug('[useBlocksManagement] Setting external blocks.');
+      setBlocks(newBlocks);
+  }, [setBlocks]);
 
   // --- Fonctions de rappel (extraites de App.tsx) --- 
 
@@ -489,6 +491,7 @@ export const useBlocksManagement = (initialMarkdown: string): UseBlocksManagemen
   // Retourner l'état et les fonctions
   return {
     blocks,
+    setExternalBlocks,
     handleDragEnd,
     handleDeleteBlock,
     handleBlockContentChange,
