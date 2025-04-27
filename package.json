@@ -3,12 +3,15 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://Helron1977.github.io/Nova/",
   "scripts": {
     "dev": "concurrently \"vite\" \"vitest --watch --passWithNoTests\"",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d ../electron/dist_vite"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.4",
@@ -24,6 +27,7 @@
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "dompurify": "^3.2.5",
+    "gh-pages": "^6.3.0",
     "jsdom": "^26.1.0",
     "msw": "^2.7.4",
     "react": "^19.1.0",
