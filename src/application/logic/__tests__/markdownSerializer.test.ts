@@ -1,5 +1,6 @@
 import { markdownToBlocks } from '../markdownParser';
 import { blocksToMarkdown } from '../markdownSerializer';
+import { Block } from '../markdownParser';
 
 describe('Markdown Serialization (blocksToMarkdown)', () => {
 
@@ -37,6 +38,25 @@ describe('Markdown Serialization (blocksToMarkdown)', () => {
         expect(serializedLines[8]).toBe('***');
     });
     
+    it('should perform a round trip with sampleMarkdown', () => {
+        // Input Markdown (copié depuis App.tsx)
+        const sampleMarkdown = `# Titre Principal\\nCeci est un paragraphe avec du **gras**, de l\'*italique*, du \\\`code inline\\\` et du ~~texte barré~~.\\nVoici aussi un [lien vers Google](https://google.com \\\"Tooltip Google\\\") !\\n\\n## Sous-titre\\n\\n- Liste non ordonnée\\n- Item 2 avec \\\`code\\\`\\n  - Sous-item\\n  - Autre sous-item avec [lien](url)\\n    1. Numéroté\\n    2. Encore un\\n- Item 3\\n\\n1. Liste ordonnée\\n2. Deuxième\\n\\n\\\`\\\`\\\`javascript\\nconsole.log(\\\"Hello, world!\\\");\\n\\\`\\\`\\\`\\n\\n> Ceci est une citation.\\n> Elle peut contenir du *style* et du \\\`code inline\\\`.\\n\\n***\\n\\n| Header 1 | Header 2         |\\n| :------- | :--------------- |\\n| Gauche   | **Centre** gras  |\\n| Test     | *Ici* [lien](url) |\\n| Et \\\`code\\\`| Normal           |\\n\\n![Une image](https://picsum.photos/150 \\\"Titre image\\\")\\n\\n\\\`\\\`\\\`mermaid\\ngraph TD;\\n    A-->B;\\n    A-->C;\\n    B-->D;\\n    C-->D;\\n\\\`\\\`\\\`\\n\\n- [ ] Tâche à faire : utiliser \\\`useEffect\\\`\\n- [x] Tâche faite : ajouter les liens\\n\\nDu <div>HTML</div> brut.\\n`;
+
+        // 1. Parser en blocs
+        const blocks: Block[] = markdownToBlocks(sampleMarkdown);
+
+        // 2. Resérialiser en Markdown
+        const serializedMarkdown = blocksToMarkdown(blocks);
+
+        // 3. Comparer (POUR L\'INSTANT : échouer pour voir la sortie)
+        // Remplacer \"EXPECTED_MARKDOWN_OUTPUT\" par la sortie réelle observée
+        // une fois que le sérialiseur est corrigé.
+        console.log("--- Serialized Output for sampleMarkdown ---");
+        console.log(serializedMarkdown);
+        // expect(serializedMarkdown.trim()).toBe("EXPECTED_MARKDOWN_OUTPUT"); // Test échouera
+        expect(serializedMarkdown.trim()).toBe(""); // Forcer l\'échec pour voir la sortie
+    });
+
     // TODO: Ajouter des tests plus spécifiques pour :
     // - Listes imbriquées (ordonnées/non ordonnées/tâches)
     // - Numérotation des listes ordonnées

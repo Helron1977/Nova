@@ -129,6 +129,7 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
 
             case 'blockquote':
                 const quoteContent = renderInlineElementsToMarkdown((block as BlockquoteBlock).content.children);
+                // Assurer que l'indentation est appliquée avant le '>'
                 blockMarkdown = quoteContent.split('\n').map(line => `${indent}> ${line}`).join('\n');
                 break;
 
@@ -177,11 +178,13 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
 
                     // Corps
                     bodyRowsMd = rows.slice(1).map(row => 
-                        `| ${row.map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`
+                        // Ajouter l'indentation à chaque ligne du corps
+                        `${indent}| ${row.map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`
                     ).join('\n');
                 }
 
-                blockMarkdown = `${headerRowMd}\n${separatorRowMd}${rows.length > 1 ? '\n' + bodyRowsMd : ''}`;
+                // Ajouter l'indentation aux lignes d'en-tête et de séparation
+                blockMarkdown = `${indent}${headerRowMd}\n${indent}${separatorRowMd}${rows.length > 1 ? '\n' + bodyRowsMd : ''}`;
                  // Réinitialiser l'état de la liste après une table
                  previousListDepth = -1;
                  previousListOrdered = false;

@@ -132,6 +132,11 @@ function App() {
         const markdownToSave = blocksToMarkdown(blocks); // Utilise `blocks` du hook
         logger.debug('[App] Markdown sérialisé pour sauvegarde.');
 
+        // --- AJOUT DU LOG DE DIAGNOSTIC (Sauvegarde) ---
+        console.log("--- Markdown à Sauvegarder ---");
+        console.log(markdownToSave);
+        // --- FIN DU LOG ---
+
         // AJOUT: Demander le nom du fichier à l'utilisateur
         let fileName = prompt("Entrez le nom du fichier pour la sauvegarde :", "document.md");
 

@@ -265,25 +265,14 @@ export const markdownToBlocks = (markdown: string): Block[] => {
 
   const parseListAndItems = (listNode: List, currentDepth: number) => {
     listNode.children.forEach((itemNode: Content) => {
-        // Le noeud listItem peut contenir des paragraphes, etc.
-        // On doit extraire les enfants inline du *premier* paragraphe ou du contenu direct.
         if (itemNode.type === 'listItem') {
-            let contentSourceNode: Parent | Node = itemNode; // Par défaut, chercher dans l'item
-
-            // Un listItem contient souvent un ou plusieurs paragraphes.
-            // On prend le contenu du premier paragraphe s'il existe.
-            // S'il y a plusieurs paragraphes ou d'autres blocs, on ne prend que le premier pour l'instant.
-            if (itemNode.children?.length > 0 && itemNode.children[0].type === 'paragraph') {
-                contentSourceNode = itemNode.children[0];
-            }
+            // --- Logique refactorisée ---
             
-            // Extraire les enfants inline de la source déterminée
-            const children = extractInlineContent(contentSourceNode as Parent);
-            
-            const listItemBlock: ListItemBlock = {
+            // 1. Créer le bloc ListItem principal immédiatement
+            const currentListItemBlock: ListItemBlock = {
                 id: uuidv4(),
                 type: 'listItem',
-                content: { children }, 
+                content: { children: [] }, // Commencer avec un contenu vide
                 metadata: {
                     depth: currentDepth,
                     ordered: listNode.ordered ?? false,
@@ -291,13 +280,110 @@ export const markdownToBlocks = (markdown: string): Block[] => {
                     position: itemNode.position,
                 }
             };
-            blocks.push(listItemBlock);
+            // Ajouter le ListItem au tableau principal DÈS MAINTENANT pour respecter l'ordre
+            blocks.push(currentListItemBlock);
 
-            // Chercher une sous-liste DANS l'itemNode original (pas contentSourceNode)
-            const nestedList = itemNode.children.find(child => child.type === 'list') as List | undefined;
-            if (nestedList) {
-                parseListAndItems(nestedList, currentDepth + 1);
-            }
+            let hasFoundMainContent = false;
+
+            // 2. Parcourir les enfants du nœud listItem de l'AST
+            itemNode.children?.forEach((childNode: Content | Node) => {
+                
+                // 2a. Gérer le contenu principal (premier paragraphe)
+                if (childNode.type === 'paragraph' && !hasFoundMainContent) {
+                    // Mettre à jour le contenu du ListItemBlock déjà créé
+                    currentListItemBlock.content.children = extractInlineContent(childNode as Parent);
+                    hasFoundMainContent = true;
+                }
+                // 2b. Gérer les sous-listes (récursion)
+                else if (childNode.type === 'list') {
+                    parseListAndItems(childNode as List, currentDepth + 1);
+                }
+                // 2c. Gérer les blocs de code imbriqués
+                else if (childNode.type === 'code') {
+                    const codeNode = childNode as any;
+                    const baseBlockData = {
+                        id: uuidv4(),
+                        metadata: { position: codeNode.position, indentationLevel: currentDepth + 1 }, 
+                    };
+                    // Créer et ajouter le bloc Code/Mermaid à la liste principale
+                    if (codeNode.lang === 'mermaid') {
+                        blocks.push({ ...baseBlockData, type: 'mermaid', content: { code: codeNode.value } } as MermaidBlock);
+                    } else {
+                        blocks.push({ ...baseBlockData, type: 'code', content: { language: codeNode.lang ?? undefined, code: codeNode.value } } as CodeBlock);
+                    }
+                }
+                // 2d. Gérer les blockquotes imbriqués
+                else if (childNode.type === 'blockquote') {
+                    const quoteNode = childNode as Parent;
+                    let blockquoteChildren: InlineElement[] = [];
+                    if ('children' in quoteNode && Array.isArray(quoteNode.children)) {
+                        quoteNode.children.forEach((blockquoteChild: Content | Node) => {
+                            blockquoteChildren = blockquoteChildren.concat(extractInlineContent(blockquoteChild as Parent));
+                        });
+                    }
+                    const baseBlockData = {
+                        id: uuidv4(),
+                        metadata: { position: quoteNode.position, indentationLevel: currentDepth + 1 },
+                    };
+                    // Créer et ajouter le BlockquoteBlock à la liste principale
+                    blocks.push({ ...baseBlockData, type: 'blockquote', content: { children: blockquoteChildren } } as BlockquoteBlock);
+                }
+                // 2e. Gérer les autres paragraphes (comme blocs séparés)
+                else if (childNode.type === 'paragraph' && hasFoundMainContent) {
+                     const baseBlockData = {
+                         id: uuidv4(),
+                         metadata: { position: childNode.position, indentationLevel: currentDepth + 1 },
+                     };
+                     // Créer et ajouter le ParagraphBlock à la liste principale
+                     blocks.push({ ...baseBlockData, type: 'paragraph', content: { children: extractInlineContent(childNode as Parent) } } as ParagraphBlock);
+                 }
+                 // 2f. Gérer les tables imbriquées
+                 else if (childNode.type === 'table') {
+                     const tableNode = childNode as any; // Utiliser 'any' pour simplifier l'accès aux champs non standards de l'AST possiblement
+                     const baseBlockData = {
+                         id: uuidv4(),
+                         metadata: { position: tableNode.position, indentationLevel: currentDepth + 1 },
+                     };
+
+                     // Extraire l'alignement
+                     const align = tableNode.align as (('left' | 'right' | 'center') | null)[] || [];
+
+                     // Extraire les lignes et les cellules
+                     const rows: InlineElement[][][] = [];
+                     if (tableNode.children && Array.isArray(tableNode.children)) {
+                         tableNode.children.forEach((tableRowNode: any) => {
+                             if (tableRowNode.type === 'tableRow') {
+                                 const rowCells: InlineElement[][] = [];
+                                 if (tableRowNode.children && Array.isArray(tableRowNode.children)) {
+                                     tableRowNode.children.forEach((tableCellNode: any) => {
+                                         if (tableCellNode.type === 'tableCell') {
+                                             // Chaque cellule contient du contenu inline, utiliser extractInlineContent
+                                             rowCells.push(extractInlineContent(tableCellNode as Parent));
+                                         } else {
+                                             logger.warn(`[parseListAndItems] Unexpected node type within tableRow: ${tableCellNode.type}`);
+                                         }
+                                     });
+                                 }
+                                 rows.push(rowCells);
+                             } else {
+                                 logger.warn(`[parseListAndItems] Unexpected node type within table: ${tableRowNode.type}`);
+                             }
+                         });
+                     }
+
+                     // Créer et ajouter le TableBlock
+                     blocks.push({
+                         ...baseBlockData,
+                         type: 'table',
+                         content: { align, rows }
+                     } as TableBlock);
+                 }
+
+            }); // Fin de la boucle sur les enfants du listItem
+            
+            // Note: Pas besoin du cas de repli "if (!primaryListItemPushed)" car on crée le ListItemBlock au début.
+
+            // --- Fin de la logique refactorisée ---
         }
     });
   };
