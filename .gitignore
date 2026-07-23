@@ -123,3 +123,6 @@ build
 # .env # Excluons aussi le .env générique
 # Exclure .env.local qui est toujours spécifique à la machine
 .env*.local
+
+# Ignore development env
+.env.development
