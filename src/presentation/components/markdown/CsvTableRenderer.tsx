@@ -3,15 +3,13 @@ import type { CodeBlock } from '@/application/logic/markdownParser';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
 
 const logger = new PinoLogger();
+import { useEditorCommands } from '@/application/context/EditorContext';
 
 interface CsvTableRendererProps {
   block: CodeBlock;
   style?: React.CSSProperties;
-  onUpdateBlockContent?: (blockId: string, newCode: string) => void;
   listIndex?: number;
   index?: number;
-  onIncreaseIndentation?: (blockId: string) => void;
-  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -64,12 +62,14 @@ const parseCsvAndRenderTable = (csvContent: string | undefined): { headers: stri
 const CsvTableRenderer = React.forwardRef<
   HTMLDivElement,
   CsvTableRendererProps
->(({ block, style, onUpdateBlockContent, listIndex, index, onIncreaseIndentation, onDecreaseIndentation, ...rest }, ref) => {
+>(({ block, style, listIndex, index, ...rest }, ref) => {
   const { code: csvContent, language } = block.content;
   const { metadata } = block;
   const indentationLevel = metadata?.indentationLevel;
 
-  const [isEditing, setIsEditing] = useState(false);
+  const { activeBlockId, setActiveBlockId, updateBlock } = useEditorCommands();
+  const isEditing = activeBlockId === block.id;
+
   const [editingCsv, setEditingCsv] = useState(csvContent || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -89,25 +89,23 @@ const CsvTableRenderer = React.forwardRef<
   }, [isEditing, csvContent]);
 
   const handleDoubleClick = useCallback(() => {
-      if (onUpdateBlockContent) {
-          setIsEditing(true);
-      } else {
-        logger.warn(`[CsvTableRenderer] Double click on table ${block.id} but onUpdateBlockContent is missing.`);
-      }
-  }, [onUpdateBlockContent, block.id]);
+      setActiveBlockId(block.id);
+  }, [setActiveBlockId, block.id]);
 
   const handleSave = useCallback(() => {
-      if (!onUpdateBlockContent) return;
       logger.debug(`[CsvTableRenderer] Saving CSV for block ${block.id}`);
-      // On envoie le CSV brut, handleBlockContentChange s'en chargera pour type 'code'
-      onUpdateBlockContent(block.id, editingCsv);
-      setIsEditing(false);
-  }, [editingCsv, block.id, onUpdateBlockContent]);
+      updateBlock(block.id, block, {
+          type: 'UPDATE_SOURCE_FOR_MODULE',
+          newRawSource: editingCsv,
+          moduleType: 'csvTable'
+      });
+      setActiveBlockId(null);
+  }, [editingCsv, block.id, updateBlock, block, setActiveBlockId]);
 
   const handleCancel = useCallback(() => {
       setEditingCsv(csvContent || '');
-      setIsEditing(false);
-  }, [csvContent]);
+      setActiveBlockId(null);
+  }, [csvContent, setActiveBlockId]);
 
   const handleTextareaChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       setEditingCsv(event.target.value);

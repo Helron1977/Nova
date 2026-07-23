@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { ImageBlock } from '@/application/logic/markdownParser';
+import type { ImageBlock, ParagraphBlock, Block } from '@/application/logic/markdownParser';
+import Tesseract from 'tesseract.js';
+import { v4 as uuidv4 } from 'uuid';
+import { ScanText, Loader2 } from 'lucide-react';
 
+
+import { useEditorCommands } from '@/application/context/EditorContext';
 
 interface CustomImageRendererProps {
   block: ImageBlock;
   style?: React.CSSProperties;
-  onUpdateBlockContent?: (blockId: string, newMarkdown: string) => void;
   listIndex?: number;
   index?: number;
-  onIncreaseIndentation?: (blockId: string) => void;
-  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -26,31 +28,33 @@ const CustomImageRenderer = React.forwardRef<
 >(({ 
   block, 
   style, 
-  onUpdateBlockContent,
   listIndex,
   index,
-  onIncreaseIndentation,
-  onDecreaseIndentation,
   ...rest 
 }, ref) => {
-  const { src, alt, title } = block.content;
+  const { activeBlockId, setActiveBlockId, updateBlock, addBlockAfter } = useEditorCommands();
+  const isEditing = activeBlockId === block.id;
+
+  const { url: src, alt, title } = block.content;
   const { metadata } = block;
   const indentationLevel = metadata?.indentationLevel;
 
   // --- State pour l'édition ---
-  const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(src || ''); // Initialiser avec src ou vide
   const inputRef = useRef<HTMLInputElement>(null); // Ref pour focus l'input
+  
+  const [isOCRRunning, setIsOCRRunning] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState('');
   // --- Fin State --- 
 
   // Initialiser/réinitialiser editUrl
   useEffect(() => {
     if (!isEditing) {
       setEditUrl(src || '');
-      // Supprimer le passage automatique en mode édition
-      // if (!src) {
-      //     setIsEditing(true);
-      // }
+      // Activer le passage automatique en mode édition si src est vide - DÉCOMMENTÉ
+      if (!src) {
+          setActiveBlockId(block.id);
+      }
     } else {
       // Garder le focus/select quand on entre manuellement en édition
       inputRef.current?.focus();
@@ -59,21 +63,60 @@ const CustomImageRenderer = React.forwardRef<
   }, [isEditing, src]);
 
   const handleClick = useCallback(() => {
-    setIsEditing(true);
-  }, []);
+    setActiveBlockId(block.id);
+  }, [setActiveBlockId, block.id]);
 
   const handleSave = useCallback(() => {
-    if (onUpdateBlockContent) {
-      const newMarkdown = buildImageMarkdown(editUrl, alt, title);
-      onUpdateBlockContent(block.id, newMarkdown);
-    }
-    setIsEditing(false);
-  }, [editUrl, alt, title, block.id, onUpdateBlockContent]);
+    const newMarkdown = buildImageMarkdown(editUrl, alt, title);
+    console.log('[CustomImageRenderer] Saving Markdown:', newMarkdown);
+    updateBlock(block.id, block, { type: 'UPDATE_SOURCE_FOR_MODULE', newRawSource: newMarkdown, moduleType: 'image' });
+    setActiveBlockId(null);
+  }, [editUrl, alt, title, block.id, updateBlock, block, setActiveBlockId]);
 
   const handleCancel = useCallback(() => {
     setEditUrl(src || ''); // Réinitialiser à la valeur originale
-    setIsEditing(false);
-  }, [src]);
+    setActiveBlockId(null);
+  }, [src, setActiveBlockId]);
+
+  const handleOCR = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!src || isOCRRunning) return;
+    
+    setIsOCRRunning(true);
+    setOcrProgress('Initialisation OCR...');
+    
+    try {
+      const result = await Tesseract.recognize(src, 'fra', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            setOcrProgress(`Analyse: ${Math.round(m.progress * 100)}%`);
+          } else {
+            setOcrProgress(m.status);
+          }
+        }
+      });
+      
+      const text = result.data.text.trim();
+      
+      if (text) {
+          const newBlock: ParagraphBlock = {
+              id: uuidv4(),
+              type: 'paragraph',
+              content: { children: [{ type: 'text', value: text, rawMarkdown: text }] },
+              metadata: { indentationLevel },
+              rawMarkdown: text
+          };
+          addBlockAfter({ afterId: block.id, newBlock: newBlock as Block });
+      }
+    } catch (err) {
+      console.error('OCR Error', err);
+      setOcrProgress('Erreur OCR');
+      setTimeout(() => setOcrProgress(''), 3000);
+    } finally {
+      setIsOCRRunning(false);
+      setTimeout(() => setOcrProgress(''), 2000);
+    }
+  }, [src, addBlockAfter, isOCRRunning, indentationLevel, block.id]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setEditUrl(event.target.value);
@@ -133,15 +176,37 @@ const CustomImageRenderer = React.forwardRef<
           <button onClick={handleCancel} style={buttonStyle}>Annuler</button>
         </div>
       ) : (
-        <img 
-          key={block.id}
-          src={src || './placeholder.png'}
-          alt={alt || 'Image (cliquez pour modifier l\'URL)'} 
-          title={title || (src ? undefined : "Cliquez pour définir l\'URL")}
-          style={{ cursor: 'pointer', maxWidth: '100%' }}
-          onClick={handleClick}
-          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => { e.currentTarget.src = './placeholder.png'; }}
-        />
+        <div className="relative inline-block group" style={{ maxWidth: '100%' }}>
+            <img 
+              key={block.id}
+              src={src || './placeholder.png'}
+              alt={alt || 'Image (cliquez pour modifier l\'URL)'} 
+              title={title || (src ? undefined : "Cliquez pour définir l\'URL")}
+              style={{ cursor: 'pointer', maxWidth: '100%' }}
+              onClick={handleClick}
+              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => { e.currentTarget.src = './placeholder.png'; }}
+            />
+            {src && (
+              <button 
+                onClick={handleOCR}
+                disabled={isOCRRunning}
+                className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 backdrop-blur-sm"
+                title="Extraire le texte (OCR)"
+              >
+                  {isOCRRunning ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span className="text-xs whitespace-nowrap">{ocrProgress}</span>
+                      </>
+                  ) : (
+                      <>
+                        <ScanText size={16} />
+                        <span className="text-xs font-medium">Extraire le texte</span>
+                      </>
+                  )}
+              </button>
+            )}
+        </div>
       )}
     </div>
   );

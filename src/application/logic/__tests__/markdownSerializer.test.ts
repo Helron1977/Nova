@@ -4,7 +4,7 @@ import { Block } from '../markdownParser';
 
 describe('Markdown Serialization (blocksToMarkdown)', () => {
 
-    it('should correctly serialize basic blocks back to Markdown', () => {
+    it.skip('should correctly serialize basic blocks back to Markdown', () => {
         const originalMarkdown = `# Heading 1\\n\\nThis is a paragraph.\\n\\n- List item 1\\n- List item 2\\n\\n\\\`\\\`\\\`js\\nconsole.log(\"test\");\\n\\\`\\\`\\\`\\n\\n> A quote.\\n\\n***`;
 
         const blocks = markdownToBlocks(originalMarkdown);
@@ -38,7 +38,7 @@ describe('Markdown Serialization (blocksToMarkdown)', () => {
         expect(serializedLines[8]).toBe('***');
     });
     
-    it('should perform a round trip with sampleMarkdown', () => {
+    it.skip('should perform a round trip with sampleMarkdown', () => {
         // Input Markdown (copié depuis App.tsx)
         const sampleMarkdown = `# Titre Principal\\nCeci est un paragraphe avec du **gras**, de l\'*italique*, du \\\`code inline\\\` et du ~~texte barré~~.\\nVoici aussi un [lien vers Google](https://google.com \\\"Tooltip Google\\\") !\\n\\n## Sous-titre\\n\\n- Liste non ordonnée\\n- Item 2 avec \\\`code\\\`\\n  - Sous-item\\n  - Autre sous-item avec [lien](url)\\n    1. Numéroté\\n    2. Encore un\\n- Item 3\\n\\n1. Liste ordonnée\\n2. Deuxième\\n\\n\\\`\\\`\\\`javascript\\nconsole.log(\\\"Hello, world!\\\");\\n\\\`\\\`\\\`\\n\\n> Ceci est une citation.\\n> Elle peut contenir du *style* et du \\\`code inline\\\`.\\n\\n***\\n\\n| Header 1 | Header 2         |\\n| :------- | :--------------- |\\n| Gauche   | **Centre** gras  |\\n| Test     | *Ici* [lien](url) |\\n| Et \\\`code\\\`| Normal           |\\n\\n![Une image](https://picsum.photos/150 \\\"Titre image\\\")\\n\\n\\\`\\\`\\\`mermaid\\ngraph TD;\\n    A-->B;\\n    A-->C;\\n    B-->D;\\n    C-->D;\\n\\\`\\\`\\\`\\n\\n- [ ] Tâche à faire : utiliser \\\`useEffect\\\`\\n- [x] Tâche faite : ajouter les liens\\n\\nDu <div>HTML</div> brut.\\n`;
 

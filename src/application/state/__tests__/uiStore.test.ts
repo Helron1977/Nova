@@ -28,13 +28,14 @@ describe('useUiStore', () => {
   });
 
   it('toggleTheme should switch theme from dark to light', () => {
-    act(() => {
-        useUiStore.setState({ theme: 'dark' });
-    });
+    // 1. Arrange: mettre le store dans l'état dark
+    useUiStore.setState({ theme: 'dark' });
+    
+    // 2. Act: appeler la fonction
     const { toggleTheme } = useUiStore.getState();
-    act(() => {
-        toggleTheme();
-    });
+    toggleTheme();
+    
+    // 3. Assert: vérifier le nouvel état
     const { theme } = useUiStore.getState();
     expect(theme).toBe('light');
   });

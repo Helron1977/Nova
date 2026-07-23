@@ -1,151 +1,167 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { BlockquoteBlock, InlineElement, TextInline } from '@/application/logic/markdownParser';
+import React, { useState, useMemo, useCallback, forwardRef } from 'react';
+import { markdownToBlocks, type BlockquoteBlock, type InlineElement } from '@/application/logic/markdownParser';
+
 import { renderInlineElements } from './InlineElementRenderer';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+import { CoreBlockEditor } from '../editor/CoreBlockEditor';
 
 const logger = new PinoLogger();
 
+import { useEditorCommands } from '@/application/context/EditorContext';
+
 interface CustomBlockquoteRendererProps {
   block: BlockquoteBlock;
-  onUpdateBlockContent?: (blockId: string, newText: string) => void;
   style?: React.CSSProperties;
   listIndex?: number;
   index?: number;
-  onIncreaseIndentation?: (blockId: string) => void;
-  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
-const getRawTextFromChildren = (children: InlineElement[] | undefined): string => {
-  if (!Array.isArray(children)) return '';
-  return children.map(child => {
-    switch (child?.type) {
-      case 'text':
-      case 'inlineCode':
-      case 'html':
-        return (child as TextInline).value || '';
-      case 'strong':
-      case 'emphasis':
-      case 'delete':
-      case 'link':
-        return child.children ? getRawTextFromChildren(child.children) : '';
-      default:
-        return '';
-    }
-  }).join('');
+// Helper pour sérialiser un bloc de citation en Markdown brut pour l'éditeur
+// Cette fonction doit inclure les préfixes '> '
+const renderBlockquoteToMarkdownForEditor = (block: BlockquoteBlock): string => {
+  // Fonction interne pour sérialiser les éléments inline en texte brut ou markdown simple
+  const serializeChildrenToMarkdown = (elements: InlineElement[] | undefined): string => {
+    if (!elements) return '';
+    return elements.map(el => {
+      if (!el) return '';
+      switch (el.type) {
+        case 'text':
+          return el.value;
+        case 'strong':
+          return `**${serializeChildrenToMarkdown(el.children)}**`;
+        case 'emphasis':
+          return `*${serializeChildrenToMarkdown(el.children)}*`;
+        case 'inlineCode':
+          return `\`${el.value}\``;
+        case 'link':
+          const linkText = serializeChildrenToMarkdown(el.children);
+          const titlePart = el.title ? ` \"${el.title}\"` : '';
+          return `[${linkText}](${el.url}${titlePart})`;
+        case 'delete':
+          return `~~${serializeChildrenToMarkdown(el.children)}~~`;
+        case 'html':
+          return el.value;
+        // Ajoutez d'autres cas pour les types inline si nécessaire
+        default:
+          logger.warn(`[serializeChildrenToMarkdown in Blockquote] Unhandled type: ${ (el as any)?.type}`);
+          return '';
+      }
+    }).join('');
+  };
+
+  const contentMarkdown = serializeChildrenToMarkdown(block.content.children);
+  
+  // Sépare le contenu en lignes et ajoute '> ' à chaque ligne
+  // Gère le cas où contentMarkdown est vide pour retourner '> '
+  if (contentMarkdown.trim() === '') {
+    return '>'; // Pour une nouvelle citation vide, commencer avec un préfixe
+  }
+  return contentMarkdown.split('\n').map(line => `> ${line}`).join('\n');
 };
 
-const CustomBlockquoteRendererComponent = React.forwardRef<
+const CustomBlockquoteRendererComponent = forwardRef<
   HTMLQuoteElement,
   CustomBlockquoteRendererProps
 >(({ 
   block, 
   style, 
-  onUpdateBlockContent, 
-  listIndex, 
-  index, 
-  onIncreaseIndentation,
-  onDecreaseIndentation,
+  listIndex,
+  index,
   ...rest 
 }, ref) => {
-  const { id, content: { children }, metadata } = block;
-  const indentationLevel = metadata?.indentationLevel;
+  const { activeBlockId, setActiveBlockId, updateBlock } = useEditorCommands();
+  const isEditing = activeBlockId === block.id;
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingText, setEditingText] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { id: blockId, content: { children }, metadata } = block;
+
+  const initialEditorContent = useMemo(() => {
+    // Utiliser la fonction helper pour obtenir le markdown brut avec les '>'
+    // ou s'appuyer sur block.content.rawMarkdown / block.content.markdown s'ils sont corrects.
+    return renderBlockquoteToMarkdownForEditor(block);
+  }, [block]); // Dépend de tout le bloc au cas où rawMarkdown est mis à jour
+
+  const handleEditorSave = useCallback((newContent: string) => {
+    logger.debug(`[CustomBlockquoteRenderer - ${blockId}] Saving Markdown:`, newContent);
+    const newBlocks = markdownToBlocks(newContent); // Parser le contenu en blocs
+    logger.debug(`[CustomBlockquoteRenderer - ${blockId}] Parsed newContent into ${newBlocks.length} blocks.`);
+    // Envoyer les blocs parsés avec la stratégie REPLACE_WITH_BLOCKS
+    updateBlock(blockId, block, { type: 'REPLACE_WITH_BLOCKS', newBlocks });
+    setActiveBlockId(null);
+  }, [updateBlock, blockId, block, setActiveBlockId]);
+
+  const handleEditorCancel = useCallback(() => {
+    logger.debug(`[CustomBlockquoteRenderer - ${blockId}] Cancelling edit.`);
+    setActiveBlockId(null);
+  }, [setActiveBlockId, blockId]);
+
+  const [clickCoords, setClickCoords] = useState<{ x: number, y: number } | null>(null);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    setClickCoords({ x: e.clientX, y: e.clientY });
+    setActiveBlockId(blockId);
+  }, [setActiveBlockId, blockId]);
+
+  React.useEffect(() => {
+    if (metadata?.isNewBlock && !isEditing) {
+      setActiveBlockId(blockId);
+      const updatedMetadata = { ...metadata };
+      delete updatedMetadata.isNewBlock;
+      updateBlock(blockId, block, { type: 'UPDATE_METADATA', metadata: updatedMetadata });
+    }
+  }, [metadata?.isNewisEditing, setActiveBlockId, blockId, updateBlock, block]);
 
   const indentationPadding = useMemo(() => {
-    const level = indentationLevel ?? 0;
+    const level = metadata?.indentationLevel ?? 0;
     return level > 0 ? `${level * 1.5}rem` : '0rem';
-  }, [indentationLevel]);
+  }, [metadata]);
 
-  const combinedStyle = useMemo(() => ({
-    ...style,
-    marginLeft: indentationPadding
-  }), [style, indentationPadding]);
+  // Styles pour le conteneur <blockquote>
+  const blockquoteStyle = useMemo(() => {
+    return {
+      ...style,
+      marginLeft: indentationPadding, // Applique le padding pour l'indentation générale du bloc
+      // La largeur est gérée par le parent ou flex, pas besoin de la recalculer ici si le padding suffit
+      // width: `calc(100% - ${indentPx}px)`,
+      // maxWidth: '100%',
+      boxSizing: 'border-box' as const,
+    };
+  }, [style, indentationPadding]);
 
-  logger.debug(`[BlockquoteRenderer ${id}] Rendering - Indentation Level: ${indentationLevel ?? 0}, marginLeft: ${indentationPadding}`);
-
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      const rawText = getRawTextFromChildren(children);
-      setEditingText(rawText);
-      logger.debug(`[BlockquoteRenderer] Initializing edit for ${id} with pure text:`, rawText);
-      textareaRef.current.value = rawText;
-      textareaRef.current.focus();
-    }
-  }, [isEditing, children, id]);
-
-  const handleDoubleClick = () => {
-    logger.debug(`[BlockquoteRenderer ${id}] handleDoubleClick triggered.`);
-    if (onUpdateBlockContent) {
-      logger.debug(`[BlockquoteRenderer] Double click on quote ${id}. Entering edit mode.`);
-      setIsEditing(true);
-    } else {
-      logger.warn(`[BlockquoteRenderer] Double click on quote ${id} but onUpdateBlockContent is missing.`);
-    }
-  };
-
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    logger.debug(`[BlockquoteRenderer ${id}] handleChange called. New value:`, event.target.value);
-    setEditingText(event.target.value);
-  };
-
-  const handleSave = () => {
-    if (!isEditing || !onUpdateBlockContent) return;
-    logger.debug(`[BlockquoteRenderer] Saving quote ${id}. Pure text:`, editingText);
-    onUpdateBlockContent(id, editingText);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    const originalRawText = getRawTextFromChildren(children);
-    setEditingText(originalRawText);
-    setIsEditing(false);
-    logger.debug(`[BlockquoteRenderer] Cancelling edit for quote ${id}.`);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    logger.debug(`[BlockquoteRenderer ${id}] handleKeyDown triggered. Key: ${event.key}, Shift: ${event.shiftKey}`);
-
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSave();
-    } else if (event.key === 'Escape') {
-      event.preventDefault(); 
-      handleCancel();
-    } else if (event.key === 'Tab') {
-        console.log('%c[BlockquoteRenderer %s] Tab pressed during edit.', 'color: darkblue;', id);
-    }
-  };
+  if (isEditing) {
+    return (
+      <div style={style} className="nova-blockquote-block editing mb-2" {...rest}>
+        <CoreBlockEditor
+          blockId={blockId}
+          initialContent={initialEditorContent}
+          onSave={handleEditorSave}
+          onCancel={handleEditorCancel}
+          languageMode="markdown"
+          enableInlineFormatting={true}
+          autoFocus={true}
+          placeholder="Saisissez votre citation..."
+          initialClickCoords={clickCoords}
+        />
+      </div>
+    );
+  }
 
   return (
     <blockquote 
-      key={block.id} 
-      ref={ref} 
-      style={combinedStyle}
-      {...rest} 
-      onDoubleClick={handleDoubleClick}
-      className="relative border-l-4 border-gray-300 pl-4 italic my-4 dark:border-gray-600"
+      ref={ref}
+      style={blockquoteStyle}
+      className="relative border-l-4 border-gray-300 pl-4 italic my-4 dark:border-gray-600 nova-blockquote-block cursor-text"
+      onClick={handleClick}
+      title="Cliquez pour éditer"
+      {...rest}
     >
-      {isEditing ? (
-        <textarea
-          ref={textareaRef}
-          value={editingText}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave}
-          className="block w-full font-sans text-base p-1 border border-blue-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-blue-400 dark:focus:border-blue-400 italic"
-          rows={Math.max(1, editingText.split('\n').length)}
-        />
-      ) : (
-        renderInlineElements(children, block.id)
-      )}
+      <div className="prose dark:prose-invert max-w-none">
+        {renderInlineElements(children, blockId)}
+      </div>
     </blockquote>
   );
 });
 
 CustomBlockquoteRendererComponent.displayName = 'CustomBlockquoteRenderer';
 
-export default CustomBlockquoteRendererComponent; 
+export default React.memo(CustomBlockquoteRendererComponent); 

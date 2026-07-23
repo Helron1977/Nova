@@ -1,0 +1,141 @@
+﻿diff --git a/src/App.tsx b/src/App.tsx
+index 53e626e..e36be6e 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -4,7 +4,7 @@ import MainContent from './presentation/components/layout/MainContent';
+ import Footer from './presentation/components/layout/Footer';
+ import { useUiStore } from './application/state/uiStore';
+ import mermaid from 'mermaid';
+-import { Block, markdownToBlocks } from './application/logic/markdownParser';
++import {markdownToBlocks } from './application/logic/markdownParser';
+ 
+ // Importer le nouveau composant ├®diteur
+ import { NovaEditor } from './presentation/components/editor/NovaEditor';
+@@ -71,9 +71,10 @@ const logger = new PinoLogger();
+ 
+ function App() {
+   const theme = useUiStore((state) => state.theme);
+-  
+-  const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown);
+-  const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
++
++  // --- SUPPRIM├ë: ├ëtats obsol├¿tes ---
++  // const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown);
++  // const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
+   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+ 
+   // --- MODIFI├ë: Utilisation du hook useBlocksManagement ---
+@@ -95,16 +96,9 @@ function App() {
+     handleDecreaseIndentation,
+   } = useBlocksManagement(initialSampleBlocks);
+ 
+-  // --- SUPPRIM├ë: Ancien ├®tat et callback ---
+-  // const [editorMarkdown, setEditorMarkdown] = useState<string>(sampleMarkdown); // Supprim├®
+-  // const [editorBlocks, setEditorBlocks] = useState<Block[]>([]); // Supprim├®, remplac├® par `blocks` du hook
++  // --- SUPPRIM├ë: Bloc comment├® obsol├¿te ---
+   /*
+-  const handleEditorChange = useCallback((newMarkdown: string, newBlocks: Block[]) => {
+-    logger.debug('[App] Editor content changed via callback');
+-    // setEditorBlocks(newBlocks); // Supprim├®
+-    setHasUnsavedChanges(true);
+-    // console.log("Nouveaux Blocks (├®tat App):", newBlocks);
+-  }, []); // Supprim├®
++  const handleEditorChange = useCallback((newMarkdown: string, newBlocks: Block[]) => { ... }, []);
+   */
+ 
+   // --- AJOUT: Surveiller les changements de blocs pour marquer comme non sauvegard├® ---
+@@ -137,12 +131,17 @@ function App() {
+     try {
+         const markdownToSave = blocksToMarkdown(blocks); // Utilise `blocks` du hook
+         logger.debug('[App] Markdown s├®rialis├® pour sauvegarde.');
+-        
++
++        // --- AJOUT DU LOG DE DIAGNOSTIC (Sauvegarde) ---
++        console.log("--- Markdown ├á Sauvegarder ---");
++        console.log(markdownToSave);
++        // --- FIN DU LOG ---
++
+         // AJOUT: Demander le nom du fichier ├á l'utilisateur
+         let fileName = prompt("Entrez le nom du fichier pour la sauvegarde :", "document.md");
+ 
+         // V├®rifier si l'utilisateur a annul├®
+-        if (fileName === null) { 
++        if (fileName === null) {
+             logger.debug('[App] Sauvegarde annul├®e par l\'utilisateur.');
+             return;
+         }
+@@ -156,18 +155,18 @@ function App() {
+             fileName += '.md';
+         }
+         // FIN AJOUT
+-        
++
+         const blob = new Blob([markdownToSave], { type: 'text/markdown;charset=utf-8' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement('a');
+         link.href = url;
+         // MODIFI├ë: Utiliser le nom de fichier choisi
+-        link.download = fileName; 
++        link.download = fileName;
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         URL.revokeObjectURL(url);
+-        
++
+         logger.debug(`[App] Fichier Markdown '${fileName}' demand├® au t├®l├®chargement.`);
+         setHasUnsavedChanges(false); // Marquer comme sauvegard├®
+     } catch (error) {
+@@ -178,22 +177,26 @@ function App() {
+   // --- MODIFI├ë: D├®pend de `blocks` du hook et `hasUnsavedChanges` ---
+   }, [blocks, hasUnsavedChanges]);
+ 
+-  // AJOUT: Fonction pour charger le contenu Markdown
++  // AJOUT: Fonction pour charger le contenu Markdown (nettoy├®e)
+   const handleLoadMarkdown = useCallback((markdownContent: string) => {
+       try {
+           logger.debug('[App] Chargement de nouveau contenu Markdown...');
+           const newBlocks = markdownToBlocks(markdownContent);
+-          setEditorMarkdown(markdownContent); // Mettre ├á jour le markdown brut (si utilis├®)
+-          setEditorBlocks(newBlocks);        // Mettre ├á jour les blocs pars├®s
+-          setHasUnsavedChanges(false);     // Consid├®rer comme "non modifi├®" initialement
+-          logger.debug('[App] Contenu charg├® et blocs mis ├á jour.');
+-          // TODO: Informer NovaEditor qu'il doit utiliser ces nouveaux blocs.
+-          // Cela pourrait n├®cessiter de passer editorBlocks comme prop ├á NovaEditor.
++
++          // --- AJOUT DU LOG DE DIAGNOSTIC ---
++          console.log("--- Blocs Pars├®s ---");
++          console.log(JSON.stringify(newBlocks, null, 2)); // Affiche la structure d├®taill├®e
++          logger.debug('[App] Blocs pars├®s depuis le fichier charg├®:', newBlocks);
++          // --- FIN DU LOG ---
++
++          setExternalBlocks(newBlocks);
++          setHasUnsavedChanges(false);
++          logger.debug('[App] Contenu charg├® et blocs mis ├á jour via le hook.');
+       } catch (error) {
+           logger.error('[App] Erreur lors du parsing du Markdown charg├®:', error);
+           alert("Erreur lors du chargement ou du parsing du fichier Markdown.");
+       }
+-  }, []); // D├®pend de setEditorMarkdown, setEditorBlocks, setHasUnsavedChanges
++  }, [setExternalBlocks]);
+ 
+   useEffect(() => {
+     const root = window.document.documentElement;
+@@ -202,8 +205,8 @@ function App() {
+     } else {
+       root.classList.remove('dark');
+     }
+-    mermaid.initialize({ 
+-      startOnLoad: false, 
++    mermaid.initialize({
++      startOnLoad: false,
+       theme: 'base',
+     });
+     logger.debug('[App] Mermaid initialized globally.');
+@@ -251,4 +254,4 @@ function App() {
+   );
+ }
+ 
+-export default App;
++export default App;
+\ No newline at end of file

@@ -28,7 +28,7 @@ const MainContent: React.FC<MainContentProps> = ({ children }) => {
   */
 
   return (
-    <main className="flex-grow container mx-auto p-4">
+    <main className="flex flex-col flex-grow container mx-auto p-4">
       {/* Supprimer le rendu ReactMarkdown statique */}
       {/* 
       <div className="prose dark:prose-invert lg:prose-xl max-w-none">

@@ -1,0 +1,1022 @@
+﻿diff --git a/src/App.tsx b/src/App.tsx
+index d0e626c..52bc88a 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState, useCallback } from 'react';
++import { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react';
+ import Header from './presentation/components/layout/Header';
+ import MainContent from './presentation/components/layout/MainContent';
+ import Footer from './presentation/components/layout/Footer';
+@@ -30,8 +30,6 @@ import CsvTableModule from './application/modules/csvTable/csvTableModule';
+ import PaletteModule from './application/modules/palette/paletteModule';
+ import DrawingModule from './application/modules/drawing/drawingModule';
+ import PersistentInputZone from './presentation/components/editor/PersistentInputZone';
+-import Button from './presentation/components/base/Button';
+-import { Trash2, Rows } from 'lucide-react';
+ 
+ const logger = new PinoLogger();
+ 
+@@ -85,6 +83,7 @@ function App() {
+   const [isLoadingInitialMarkdown, setIsLoadingInitialMarkdown] = useState<boolean>(true);
+   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+   const [originalLoadedBlocks, setOriginalLoadedBlocks] = useState<Block[] | null>(null);
++  const blocksContainerRef = useRef<HTMLDivElement>(null);
+ 
+   const {
+     blocksState,
+@@ -261,11 +260,11 @@ function App() {
+   }, [setExternalBlocks]);
+ 
+   useEffect(() => {
+-    const root = window.document.documentElement;
+-    if (theme === 'dark') {
+-      root.classList.add('dark');
++    document.documentElement.classList.remove('light', 'dark', 'printer-theme');
++    if (theme === 'printer') {
++      document.documentElement.classList.add('printer-theme');
+     } else {
+-      root.classList.remove('dark');
++      document.documentElement.classList.add(theme);
+     }
+     mermaid.initialize({ 
+       startOnLoad: false,
+@@ -609,6 +608,19 @@ ${finalHtmlContent}
+     };
+   }, [blocksState.isSelectionModeActive, blocksState.selectedBlockIds, deleteSelectedBlocks]);
+ 
++  // Scroll to the bottom spacer div
++  useLayoutEffect(() => {
++    if (blocksContainerRef.current) { // Ensure the scrollable container itself exists
++      const spacerElement = document.getElementById('nova-editor-bottom-spacer');
++      if (spacerElement) {
++        spacerElement.scrollIntoView({ behavior: 'auto', block: 'end' }); // 'auto' might be less jarring for frequent updates
++        logger.debug('[App useLayoutEffect] Scrolled to #nova-editor-bottom-spacer.');
++      } else {
++        logger.warn('[App useLayoutEffect] Could not find #nova-editor-bottom-spacer to scroll to.');
++      }
++    }
++  }, [blocksState.blocks, logger]); // Rerun when blocks change
++
+   if (isLoadingInitialMarkdown) {
+     return (
+       <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200 items-center justify-center`}>
+@@ -619,42 +631,50 @@ ${finalHtmlContent}
+   }
+ 
+   return (
+-    <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'dark' : ''} transition-colors duration-200`}>
++    <div className={`flex flex-col min-h-screen transition-colors duration-300 
++      ${theme === 'light' ? 'bg-gray-100 text-gray-800' : 
++        theme === 'dark' ? 'bg-gray-900 text-gray-200' : 
++        'printer-styles' // Classe pour le th├¿me imprimante
++      }`}>
+       <Header 
+         onLoadMarkdown={handleLoadMarkdown}
+         onExport={handleFullExportProcess}
+         hasUnsavedChanges={hasUnsavedChanges}
+       /> 
+       <MainContent>
+-        <div className="prose dark:prose-invert max-w-4xl mx-auto pt-8 pb-96 mt-8 bg-white dark:bg-gray-800 rounded-md shadow-md">
+-          <NovaEditor
+-            blocks={blocksState.blocks}
+-            isSelectionModeActive={blocksState.isSelectionModeActive}
+-            selectedBlockIds={blocksState.selectedBlockIds}
+-            onToggleBlockSelection={toggleBlockSelection}
+-            onDragEnd={handleDragEnd}
+-            onDeleteBlock={handleDeleteBlock} 
+-            onAddBlockAfter={handleAddBlockAfter}
+-            onAddDropZoneBlockAfter={handleAddDropZoneBlockAfter}
+-            onUpdateBlockContent={requestBlockUpdate}
+-            onIncreaseIndentation={handleIncreaseIndentation}
+-            onDecreaseIndentation={handleDecreaseIndentation}
+-            handleAddSummaryBlock={handleAddSummaryBlock}
+-            setSelectedBlocksBatch={setSelectedBlocksBatch}
+-          />
++        <div className="flex flex-col flex-grow h-full max-w-4xl mx-auto w-full min-h-0">
++          <div ref={blocksContainerRef} className="flex-grow overflow-y-auto min-h-0 prose dark:prose-invert bg-white dark:bg-gray-800 rounded-t-md shadow-md p-6">
++            <NovaEditor
++              blocks={blocksState.blocks}
++              isSelectionModeActive={blocksState.isSelectionModeActive}
++              selectedBlockIds={blocksState.selectedBlockIds}
++              onToggleBlockSelection={toggleBlockSelection}
++              onDragEnd={handleDragEnd}
++              onDeleteBlock={handleDeleteBlock}
++              onAddBlockAfter={handleAddBlockAfter}
++              onAddDropZoneBlockAfter={handleAddDropZoneBlockAfter}
++              onUpdateBlockContent={requestBlockUpdate}
++              onIncreaseIndentation={handleIncreaseIndentation}
++              onDecreaseIndentation={handleDecreaseIndentation}
++              handleAddSummaryBlock={handleAddSummaryBlock}
++              setSelectedBlocksBatch={setSelectedBlocksBatch}
++            />
++          </div>
++          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-b-md shadow-md">
++            <PersistentInputZone
++              onAddBlock={handleAddBlockAtEnd}
++              isSelectionModeActive={blocksState.isSelectionModeActive}
++              selectedBlockCount={blocksState.selectedBlockIds.length}
++              onToggleSelectionMode={toggleSelectionMode}
++              onDeleteSelectedBlocks={() => {
++                if (blocksState.selectedBlockIds.length > 0 && window.confirm(`├ètes-vous s├╗r de vouloir supprimer les ${blocksState.selectedBlockIds.length} bloc(s) s├®lectionn├®(s) ?`)) {
++                  deleteSelectedBlocks();
++                }
++              }}
++            />
++          </div>
+         </div>
+       </MainContent>
+-      <PersistentInputZone 
+-        onAddBlock={handleAddBlockAtEnd} 
+-        isSelectionModeActive={blocksState.isSelectionModeActive}
+-        selectedBlockCount={blocksState.selectedBlockIds.length}
+-        onToggleSelectionMode={toggleSelectionMode}
+-        onDeleteSelectedBlocks={() => {
+-          if (blocksState.selectedBlockIds.length > 0 && window.confirm(`├ètes-vous s├╗r de vouloir supprimer les ${blocksState.selectedBlockIds.length} bloc(s) s├®lectionn├®(s) ?`)) {
+-            deleteSelectedBlocks();
+-          }
+-        }}
+-      />
+       <Footer />
+     </div>
+   );
+diff --git a/src/application/config/markdownSelector.config.ts b/src/application/config/markdownSelector.config.ts
+index 0c0e7b7..cb9588f 100644
+--- a/src/application/config/markdownSelector.config.ts
++++ b/src/application/config/markdownSelector.config.ts
+@@ -8,7 +8,7 @@ interface SelectionEntry {
+ // L'UTILISATEUR MODIFIERA LE 'marker' CI-DESSOUS POUR S├ëLECTIONNER UN FICHIER
+ // UN SEUL 'X' EST ATTENDU PARMI TOUTES LES ENTR├ëES.
+ export const selectionConfiguration: SelectionEntry[] = [
+-  { marker: ' ', path: '@/application/config/initialMarkdown.ts', description: 'D├®faut : Contenu complet original' },
++  { marker: 'X', path: '@/application/config/initialMarkdown.ts', description: 'D├®faut : Contenu complet original' },
+   { marker: ' ', path: '@/application/config/initialMarkdownPalette.ts', description: 'Palette de couleurs' },
+   { marker: ' ', path: '@/application/config/initialMarkdownParagraph.ts', description: 'Paragraphes simples' },
+   { marker: ' ', path: '@/application/config/initialMarkdownHeading.ts', description: 'Titre de niveau 2' },
+@@ -22,7 +22,7 @@ export const selectionConfiguration: SelectionEntry[] = [
+   { marker: ' ', path: '@/application/config/initialMarkdownSpace.ts', description: 'Bloc Espace (h=75)' },
+   { marker: ' ', path: '@/application/config/initialMarkdownCsv.ts', description: 'Bloc CSV (tableau)' },
+   { marker: ' ', path: '@/application/config/initialMarkdownThematicBreak.ts', description: 'Lignes th├®matiques (s├®parateurs)' },
+-  { marker: 'X', path: '@/application/config/initialMarkdownDrawing.ts', description: 'Module de Dessin' },
++  { marker: ' ', path: '@/application/config/initialMarkdownDrawing.ts', description: 'Module de Dessin' },
+ ];
+ 
+ export const getSelectedInitialMarkdownModulePath = (): string => {
+diff --git a/src/application/hooks/useBlockEditor.ts b/src/application/hooks/useBlockEditor.ts
+index ce70607..9c64685 100644
+--- a/src/application/hooks/useBlockEditor.ts
++++ b/src/application/hooks/useBlockEditor.ts
+@@ -45,7 +45,7 @@ export interface InlineMenuState {
+   show: boolean;
+   top: number;
+   left: number;
+-  // hasSelection: boolean; // On peut d├®duire de 'show' ou l'ajouter explicitement si n├®cessaire
++  hasSelection: boolean;
+ }
+ 
+ // MODIFI├ë: Renommer en CoreBlockEditorProps et exporter
+@@ -120,7 +120,7 @@ export const useBlockEditor = (options: CoreBlockEditorProps) => {
+   const [blockEditorView, setBlockEditorView] = useState<EditorView | null>(null);
+   const blockEditorViewRef = useRef<EditorView | null>(null); // Pour l'acc├¿s dans les callbacks
+   const [isEditorReady, setIsEditorReady] = useState<boolean>(false);
+-  const [inlineMenuState, setInlineMenuState] = useState<InlineMenuState>({ show: false, top: 0, left: 0 });
++  const [inlineMenuState, setInlineMenuState] = useState<InlineMenuState>({ show: false, top: 0, left: 0, hasSelection: false });
+   
+   // AJOUT: Stocker l'ID de l'instance de l'├®diteur
+   const editorInstanceIdRef = useRef<number | null>(null);
+@@ -216,15 +216,15 @@ export const useBlockEditor = (options: CoreBlockEditorProps) => {
+                 if (!selection.empty) {
+                     const coords = update.view.coordsAtPos(selection.head);
+                     if (coords) {
+-                        setInlineMenuState({ show: true, top: coords.bottom + 5, left: coords.left });
++                        setInlineMenuState({ show: true, top: coords.bottom + 5, left: coords.left, hasSelection: true });
+                     } else {
+-                        setInlineMenuState({ show: false, top: 0, left: 0 });
++                        setInlineMenuState({ show: false, top: 0, left: 0, hasSelection: false });
+                     }
+                 } else {
+-                    setInlineMenuState({ show: false, top: 0, left: 0 });
++                    setInlineMenuState({ show: false, top: 0, left: 0, hasSelection: false });
+                 }
+             } else if (enableInlineFormatting) {
+-                setInlineMenuState({ show: false, top: 0, left: 0 });
++                setInlineMenuState({ show: false, top: 0, left: 0, hasSelection: false });
+             }
+ 
+             if (update.view !== blockEditorViewRef.current) {
+diff --git a/src/application/hooks/useBlocksManagement.ts b/src/application/hooks/useBlocksManagement.ts
+index 1d86f6e..71a12d6 100644
+--- a/src/application/hooks/useBlocksManagement.ts
++++ b/src/application/hooks/useBlocksManagement.ts
+@@ -2,12 +2,11 @@ import { useReducer, useCallback } from 'react';
+ import { v4 as uuidv4 } from 'uuid';
+ import { arrayMove } from '@dnd-kit/sortable';
+ import type { DragEndEvent } from '@dnd-kit/core';
+-import type { Block, ListItemBlock, ParagraphBlock, CodeBlock, MarkerStyle, DropZoneBlock, ColorInfo, HeadingBlock, InlineElement, UniversalBlockMetadata, MermaidBlock } from '@/application/logic/markdownParser';
+-import { markdownToBlocks, parsePaletteCodeContent } from '@/application/logic/markdownParser';
++import type { Block, ListItemBlock, ParagraphBlock, CodeBlock, MarkerStyle, DropZoneBlock, HeadingBlock, InlineElement, UniversalBlockMetadata, MermaidBlock } from '@/application/logic/markdownParser';
+ import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+ import { Position } from 'unist';
+ import { getBlockModuleByType, getBlockModuleByCodeLanguage } from '@/application/logic/blockRegistry';
+-import type { PaletteBlockData } from '@/application/modules/palette/paletteModule';
++
+ 
+ // Initialisation du logger pour ce hook
+ const logger = new PinoLogger();
+@@ -36,7 +35,6 @@ interface UpdateBlockAction {
+   type: 'UPDATE_BLOCK'; 
+   payload: {
+     blockId: string; // ID du bloc original ├®dit├®
+-    originalBlock: Block; // Passer le bloc original pour r├®f├®rence (m├®tadonn├®es, type pr├®c├®dent)
+     updateStrategy: 
+       | { type: 'REPLACE_WITH_BLOCKS'; newBlocks: Block[] } 
+       | { type: 'UPDATE_SOURCE_FOR_MODULE'; newRawSource: string; moduleType: string }
+@@ -152,7 +150,7 @@ const blocksReducer = (state: BlocksState, action: BlockAction): BlocksState =>
+                 movedItems[endIndex] = {
+                     ...movedBlock,
+                     metadata: {
+-                        ...movedBlock.metadata,
++                        ...(movedBlock.metadata || {}),
+                         indentationLevel: targetIndentationLevel
+                     }
+                 } as Block;
+@@ -168,7 +166,7 @@ const blocksReducer = (state: BlocksState, action: BlockAction): BlocksState =>
+             };
+ 
+         case 'UPDATE_BLOCK': {
+-            const { blockId, originalBlock: passedOriginalBlock, updateStrategy } = action.payload;
++            const { blockId, updateStrategy } = action.payload;
+             const originalBlockIndex = state.blocks.findIndex(block => block.id === blockId);
+ 
+             if (originalBlockIndex === -1) {
+@@ -181,7 +179,11 @@ const blocksReducer = (state: BlocksState, action: BlockAction): BlocksState =>
+ 
+             if (updateStrategy.type === 'UPDATE_SOURCE_FOR_MODULE') {
+                 const { newRawSource, moduleType } = updateStrategy;
+-                const moduleForUpdate = getBlockModuleByType(moduleType);
++                // Essayer d'abord par codeLanguage, puis par type si moduleType est un vrai type de bloc.
++                let moduleForUpdate = getBlockModuleByCodeLanguage(moduleType);
++                if (!moduleForUpdate) {
++                    moduleForUpdate = getBlockModuleByType(moduleType);
++                }
+ 
+                 if (moduleForUpdate && moduleForUpdate.updateBlockFromSource) {
+                     logger.debug(`[blocksReducer] Strategy UPDATE_SOURCE_FOR_MODULE: Module "${moduleForUpdate.type}" has updateBlockFromSource. Calling it.`);
+@@ -523,7 +525,7 @@ export type UpdateStrategyPayload =
+ 
+ // Interface pour les valeurs de retour du hook (modifi├®e)
+ interface UseBlocksManagementReturn {
+-  blocksState: BlocksState; // Remplacer `blocks` par `blocksState`
++  blocksState: BlocksState; 
+   setExternalBlocks: (newBlocks: Block[]) => void;
+   handleDragEnd: (event: DragEndEvent) => void;
+   handleDeleteBlock: (idToDelete: string) => void;
+@@ -593,16 +595,16 @@ export const useBlocksManagement = (initialBlocks: Block[]): UseBlocksManagement
+   }, []);
+ 
+   const requestBlockUpdate = useCallback((blockId: string, originalBlock: Block, strategyPayload: UpdateStrategyPayload) => {
+-      logger.debug(`[useBlocksManagement] Dispatching UPDATE_BLOCK for ID: ${blockId}, Strategy: ${strategyPayload.type}`);
+-      dispatch({ 
+-          type: 'UPDATE_BLOCK', 
+-          payload: { 
+-              blockId, 
+-              originalBlock, // Le bloc original avant modification
+-              updateStrategy: strategyPayload 
+-          }
+-      });
+-  }, []);
++    void originalBlock; // Param├¿tre conserv├® pour la compatibilit├® de l'interface, non utilis├® directement ici.
++    logger.debug(`[useBlocksManagement] Dispatching UPDATE_BLOCK for ID: ${blockId}, Strategy: ${strategyPayload.type}`);
++    dispatch({ 
++        type: 'UPDATE_BLOCK', 
++        payload: { 
++            blockId, 
++            updateStrategy: strategyPayload 
++        }
++    });
++}, []);
+ 
+   const handleAddBlockAfter = useCallback((data: { afterId: string; newBlock: Block }) => {
+       logger.debug(`[useBlocksManagement] Dispatching ADD_BLOCK_AFTER ID: ${data.afterId}`);
+diff --git a/src/application/logic/markdownParser.ts b/src/application/logic/markdownParser.ts
+index 5e4dad5..5e386f4 100644
+--- a/src/application/logic/markdownParser.ts
++++ b/src/application/logic/markdownParser.ts
+@@ -5,8 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
+ import type { Position, Node, Parent } from 'unist'; // Conserver Position de unist, ajouter Node et Parent
+ import type { Root, Content, Text, HTML } from 'mdast'; // Utiliser mdast pour Root et Content, ajouter List et ListItem, et ajouter Text, Strong, Emphasis, HTML
+ import { PinoLogger } from '@/infrastructure/logging/PinoLogger'; // Importer le logger
+-import { getBlockModuleByCodeLanguage } from './blockRegistry';
+-import type { BlockModule } from '../interfaces/blockModule'; // Pour typer moduleInstance
++import { getBlockModuleByCodeLanguage } from './blockRegistry';// Pour typer moduleInstance
+ import type { PaletteBlockData } from '../modules/palette/paletteModule'; // AJOUT├ë
+ import { DrawingBlock, DrawingBlockData } from '../modules/drawing/types'; // AJOUT: Importer les types Drawing
+ 
+@@ -346,38 +345,43 @@ export const parsePaletteCodeContent = (code: string): ColorInfo[] => {
+ // Fonction utilitaire pour s├®rialiser un listItem en Markdown
+ function serializeInlineElementsToMarkdown(elements: InlineElement[] | undefined): string {
+   if (!elements) return '';
+-  return elements.map(element => {
+-    if (!element) return '';
+-    switch (element.type) {
+-      case 'text': return (element as TextInline).value;
+-      case 'strong': return `**${serializeInlineElementsToMarkdown((element as StrongInline).children)}**`;
+-      case 'emphasis': return `*${serializeInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
+-      case 'inlineCode': return `\`${(element as InlineCodeElement).value}\``;
+-      case 'link': {
+-        const link = element as LinkInline;
+-        const linkText = serializeInlineElementsToMarkdown(link.children);
+-        const titlePart = link.title ? ` \"${link.title}\"` : '';
+-        return `[${linkText}](${link.url}${titlePart})`;
++  return elements
++    .filter(element => !!element) // Filtrer les ├®l├®ments nuls ou non d├®finis
++    .map(element => {
++      // element est maintenant garanti d'├¬tre non-nul ici gr├óce au filter
++      switch (element.type) {
++        case 'text': return (element as TextInline).value;
++        case 'strong': return `**${serializeInlineElementsToMarkdown((element as StrongInline).children)}**`;
++        case 'emphasis': return `*${serializeInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
++        case 'inlineCode': return `\`${(element as InlineCodeElement).value}\``;
++        case 'link': {
++          const link = element as LinkInline;
++          const linkText = serializeInlineElementsToMarkdown(link.children);
++          const titlePart = link.title ? ` \"${link.title}\"` : '';
++          return `[${linkText}](${link.url}${titlePart})`;
++        }
++        case 'delete': return `~~${serializeInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
++        case 'html': return (element as HTMLInline).value;
++        default:
++          // const unhandledType = (element as any).type;
++          // console.warn(`[serializeInlineElementsToMarkdown] Unhandled inline element type: ${unhandledType}`);
++          return ''; // Retourner une cha├«ne vide pour les types non g├®r├®s
+       }
+-      case 'delete': return `~~${serializeInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
+-      case 'html': return (element as HTMLInline).value;
+-      default: return '';
+-    }
+-  }).join('');
++    }).join('');
+ }
+ 
+-function serializeListItemToMarkdown(block: ListItemBlock): string {
+-  // Puce
+-  const marker = block.metadata.ordered ? '1.' : '-';
+-  // Checkbox
++export function serializeListItemToMarkdown(block: ListItemBlock): string {
++  const metadata = block.metadata || {};
++  const marker = metadata.ordered ? '1.' : '-';
+   let checkbox = '';
+-  if (block.metadata.checked === true) checkbox = ' [x]';
+-  else if (block.metadata.checked === false) checkbox = ' [ ]';
+-  // Texte
+-  const text = serializeInlineElementsToMarkdown(block.content.children);
++  if (metadata.checked === true) checkbox = ' [x]';
++  else if (metadata.checked === false) checkbox = ' [ ]';
++  const textContent = block.content?.children;
++  const text = serializeInlineElementsToMarkdown(textContent);
+   return `${marker}${checkbox} ${text}`.trim();
+ }
+ 
++
+ // Nouvelle fonction de parsing centralis├®e pour tous les types de n┼ôuds
+ const parseNodeToBlock = (
+   node: Content | Node,
+@@ -590,8 +594,8 @@ const processNodeAndChildren = (
+   blocks: Block[],
+   currentIndentationLevel: number = 0,
+   // additionalMetadata n'est plus directement utilis├® ici, mais on passe les infos parentales pour les listes
+-  parentListData?: { ordered: boolean; markerStyle: MarkerStyle },
+-  rawMarkdownForNode?: string // Le Markdown brut pour ce noeud sp├®cifique
++  _parentListData?: { ordered: boolean; markerStyle: MarkerStyle },
++  _rawMarkdownForNode?: string // Le Markdown brut pour ce noeud sp├®cifique
+ ): void => {
+   const currentRawMarkdown = getRawMarkdownFromNode(node) ?? '';
+ 
+@@ -601,7 +605,7 @@ const processNodeAndChildren = (
+     // D├®terminer markerStyle (simplifi├®, peut ├¬tre am├®lior├®)
+     let markerStyle: MarkerStyle = ordered ? 'decimal' : 'bullet';
+     if (listNode.children.length > 0) {
+-        const firstChild = listNode.children[0] as import('mdast').ListItem;
++        //const firstChild = listNode.children[0] as import('mdast').ListItem;
+         // Une logique plus fine pourrait ├¬tre n├®cessaire pour d├®terminer le style exact ├á partir du contenu brut
+         // ou des propri├®t├®s de remark-parse si elles existent.
+         // Pour l'instant, on se base sur 'ordered'.
+diff --git a/src/application/logic/markdownSerializer.ts b/src/application/logic/markdownSerializer.ts
+index b847fd3..a973529 100644
+--- a/src/application/logic/markdownSerializer.ts
++++ b/src/application/logic/markdownSerializer.ts
+@@ -1,74 +1,42 @@
+-import type { Block } from './markdownParser';
+-import type { InlineElement } from './markdownParser';
+-import type { TextInline } from './markdownParser';
+-import type { StrongInline } from './markdownParser';
+-import type { EmphasisInline } from './markdownParser';
+-import type { HTMLInline } from './markdownParser';
+-import type { LinkInline } from './markdownParser';
+-import type { InlineCodeElement } from './markdownParser';
+-import type { DeleteInline } from './markdownParser';
+-import type { HeadingBlock } from './markdownParser';
+-import type { ParagraphBlock } from './markdownParser';
+-import type { ListItemBlock } from './markdownParser';
+-import type { CodeBlock } from './markdownParser';
+-import type { MermaidBlock } from './markdownParser';
+-import type { ImageBlock } from './markdownParser';
+-import type { BlockquoteBlock } from './markdownParser';
++import type { Block, ListItemBlock, CodeBlock, MermaidBlock, ImageBlock, BlockquoteBlock, TableBlock, HTMLBlock, HeadingBlock, ParagraphBlock, InlineElement, TextInline, StrongInline, EmphasisInline, HTMLInline, LinkInline, InlineCodeElement, DeleteInline } from './markdownParser';
++import { serializeListItemToMarkdown } from './markdownParser'; // Correction: Import├® comme valeur
+ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+ // import type { ThematicBreakBlock } from './markdownParser'; // Supprim├® car non utilis├®
+-import type { TableBlock } from './markdownParser';
+-import type { HTMLBlock } from './markdownParser';
+-import type { PaletteBlock } from './markdownParser';
+-import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
++import { PinoLogger } from '../../infrastructure/logging/PinoLogger';
++import type { BlockModule } from '../interfaces/blockModule';
+ 
+ // AJOUT: Importer les types et fonctions n├®cessaires pour les modules
+-import { getBlockModuleByType } from './blockRegistry'; 
+-import type { BlockModule } from '../interfaces/blockModule';
++import { getBlockModuleByType } from './blockRegistry';
+ 
+ const logger = new PinoLogger();
+ 
+-// Helper pour s├®rialiser les ├®l├®ments inline en Markdown
++// Helper pour s├®rialiser les ├®l├®ments inline en Markdown (style fonctionnel)
+ const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
+-    let markdownString = '';
+-
+-    elements.forEach(element => {
++    return elements
++      .map(element => {
+         switch (element.type) {
+             case 'text':
+-                // Remplacer les \n litt├®raux par de vrais sauts de ligne
+-                // Utiliser replace avec regex globale pour compatibilit├®
+-                const textValue = (element as TextInline).value.replace(/\\n/g, '\n'); // Correction ici
+-                markdownString += textValue;
+-                break;
++                return (element as TextInline).value.replace(/\\n/g, '\n');
+             case 'strong':
+-                markdownString += `**${renderInlineElementsToMarkdown((element as StrongInline).children)}**`;
+-                break;
++                return `**${renderInlineElementsToMarkdown((element as StrongInline).children)}**`;
+             case 'emphasis':
+-                markdownString += `*${renderInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
+-                break;
++                return `*${renderInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
+             case 'inlineCode':
+-                markdownString += `\`${(element as InlineCodeElement).value}\``;
+-                break;
++                return `\`${(element as InlineCodeElement).value}\``;
+             case 'link':
+                 const link = element as LinkInline;
+                 const linkText = renderInlineElementsToMarkdown(link.children);
+-                const titlePart = link.title ? ` "${link.title}"` : '';
+-                // *** CORRECTION CL├ë : Utiliser link.url directement ***
+-                markdownString += `[${linkText}](${link.url}${titlePart})`; 
+-                break;
++                const titlePart = link.title ? ` \"${link.title}\"` : '';
++                return `[${linkText}](${link.url}${titlePart})`; 
+             case 'delete':
+-                markdownString += `~~${renderInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
+-                break;
++                return `~~${renderInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
+             case 'html':
+-                // Le HTML inline est simplement ajout├® tel quel
+-                markdownString += (element as HTMLInline).value;
+-                break;
++                return (element as HTMLInline).value;
+             default:
+                 logger.warn(`[renderInlineElementsToMarkdown] Unhandled inline element type: ${(element as any)?.type}`, { element });
+-                break;
++                return ''; 
+         }
+-    });
+-
+-    return markdownString;
++    }).join('');
+ };
+ 
+ // Fonction principale pour s├®rialiser les blocs
+@@ -122,28 +90,33 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
+ 
+             case 'listItem':
+                 const listItem = block as ListItemBlock;
+-                let marker: string;
+                 const currentItemDepth = listItem.metadata.depth ?? 0;
+-                // const currentMarkerStyle = listItem.metadata.markerStyle || (listItem.metadata.ordered ? 'decimal' : 'bullet');
++                // La fonction serializeListItemToMarkdown s'occupe du style de puce/checkbox et du contenu.
++                // Mais pour les listes ordonn├®es, nous devons g├®rer le num├®ro d'item ici.
++                const serializedItemBase = serializeListItemToMarkdown(listItem); // Ex: "1. [ ] Texte" ou "- Texte"
+ 
+-                // Logique de num├®rotation simplifi├®e pour se concentrer sur l'indentation
+                 if (listItem.metadata.ordered) {
++                    // R├®initialiser le compteur si la profondeur change ou si on passe d'une liste non ordonn├®e ├á ordonn├®e
+                     if (currentItemDepth > previousListDepth || !previousListOrdered || currentItemDepth < previousListDepth) {
+-                        currentListNumber = 1; // R├®initialiser si la profondeur change ou si on passe de non ordonn├® ├á ordonn├®
++                        currentListNumber = 1;
++                    }
++                    // Extraire le contenu apr├¿s le marqueur "1. " (ou ce que serializeListItemToMarkdown produit pour un item ordonn├®)
++                    // Ceci est un peu fragile si serializeListItemToMarkdown change son format exact pour "1. "
++                    let contentPart = serializedItemBase;
++                    if (serializedItemBase.startsWith('1. ')) {
++                        contentPart = serializedItemBase.substring(3); // Enl├¿ve "1. "
++                    } else if (serializedItemBase.startsWith('1.')) { // Au cas o├╣ il n'y aurait pas d'espace
++                         contentPart = serializedItemBase.substring(2); // Enl├¿ve "1."
+                     }
+-                    marker = `${currentListNumber}.`;
+-                    currentListNumber++;
++                    
++                    blockMarkdown = `${indent}${currentListNumber}. ${contentPart}`;
++                    currentListNumber++; // Incr├®menter pour le prochain item ordonn├® au m├¬me niveau
+                     previousListOrdered = true;
+                 } else {
+-                    marker = '-';
+-                    previousListOrdered = false;
++                    blockMarkdown = `${indent}${serializedItemBase}`;
++                    previousListOrdered = false; // Marquer que la derni├¿re liste rencontr├®e n'├®tait pas ordonn├®e
+                 }
+                 previousListDepth = currentItemDepth;
+-
+-                const checkedMarker = listItem.metadata.checked === true ? '[x]' : listItem.metadata.checked === false ? '[ ]' : null;
+-                const taskListPrefix = checkedMarker ? `${checkedMarker} ` : '';
+-                // Appliquer l'indentation calcul├®e au d├®but de la ligne de l'item
+-                blockMarkdown = `${indent}${marker} ${taskListPrefix}${renderInlineElementsToMarkdown(listItem.content.children)}`;
+                 break;
+ 
+             case 'code':
+@@ -241,7 +214,7 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
+ };
+ 
+ // AJOUT: Fonction pour convertir un nombre en chiffres romains (simpliste)
+-function toRoman(num: number): string {
++/* function toRoman(num: number): string {
+     if (num < 1 || num > 3999) return num.toString(); // Gestion simple des limites
+     const roman = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+     let str = '';
+@@ -251,4 +224,4 @@ function toRoman(num: number): string {
+         str += i.repeat(q);
+     }
+     return str;
+-} 
+\ No newline at end of file
++}  */
+\ No newline at end of file
+diff --git a/src/application/modules/csvTable/CsvModuleRenderer.tsx b/src/application/modules/csvTable/CsvModuleRenderer.tsx
+index 2fe931b..9197b82 100644
+--- a/src/application/modules/csvTable/CsvModuleRenderer.tsx
++++ b/src/application/modules/csvTable/CsvModuleRenderer.tsx
+@@ -1,5 +1,4 @@
+ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+-import type { Block } from '../../logic/markdownParser'; // Corrig├®
+ import type { BlockRendererProps } from '../../interfaces/blockModule'; // Corrig├®
+ import type { CsvTableData } from './csvTableModule';
+ import { PinoLogger } from '../../../infrastructure/logging/PinoLogger'; // Corrig├®
+diff --git a/src/application/modules/csvTable/csvTableModule.ts b/src/application/modules/csvTable/csvTableModule.ts
+index 545127f..fbf01e0 100644
+--- a/src/application/modules/csvTable/csvTableModule.ts
++++ b/src/application/modules/csvTable/csvTableModule.ts
+@@ -1,4 +1,4 @@
+-import type { BlockModule, BlockEditorProps, BlockRendererProps } from '../../interfaces/blockModule';
++import type { BlockModule } from '../../interfaces/blockModule';
+ // Remarquez que CsvModuleRenderer est import├® AVANT sa cr├®ation, c'est OK pour TS.
+ import { CsvModuleRenderer } from './CsvModuleRenderer'; 
+ import { PinoLogger } from '../../../infrastructure/logging/PinoLogger';
+diff --git a/src/application/modules/drawing/drawingModule.ts b/src/application/modules/drawing/drawingModule.ts
+index 49f4089..597d875 100644
+--- a/src/application/modules/drawing/drawingModule.ts
++++ b/src/application/modules/drawing/drawingModule.ts
+@@ -256,6 +256,46 @@ const DrawingModule: BlockModule<DrawingBlockData> = {
+     return JSON.stringify(dataToStore);
+   },
+ 
++  serializeToHTML: (customData: DrawingBlockData, blockId: string): string => {
++    logger.debug(`[DrawingModule ${blockId}] Serializing to HTML. SVG path commands (first 100): ${customData.svgPathCommands.substring(0, 100)}...`);
++    if (!customData || !customData.svgPathCommands) {
++      logger.warn(`[DrawingModule ${blockId}] No SVG path commands found in customData for HTML serialization.`);
++      return `<div class="drawing-module-export drawing-module-error" data-block-id="${blockId}">Erreur: Donn├®es de dessin non disponibles pour l'export.</div>`;
++    }
++
++    const svgWidth = customData.width || DRAWING_DEFAULT_WIDTH;
++    const svgHeight = customData.height || DRAWING_DEFAULT_HEIGHT;
++    const strokeColor = customData.strokeColor || '#000000';
++    const strokeWidth = customData.strokeWidth || 2;
++
++    const svgContent = `
++      <svg 
++        xmlns="http://www.w3.org/2000/svg" 
++        width="${svgWidth}" 
++        height="${svgHeight}" 
++        viewBox="0 0 ${svgWidth} ${svgHeight}" 
++        fill="none" 
++        stroke="${strokeColor}" 
++        stroke-width="${strokeWidth}" 
++        stroke-linecap="round" 
++        stroke-linejoin="round"
++      >
++        <path d="${customData.svgPathCommands}"></path>
++      </svg>
++    `;
++
++    logger.debug(`[DrawingModule ${blockId}] Generated SVG for HTML export (first 150 chars): ${svgContent.substring(0,150)}...`);
++    return `
++      <div 
++        class="drawing-module-export" 
++        data-block-id="${blockId}" 
++        style="width: ${svgWidth}px; height: ${svgHeight}px; overflow: hidden; margin: 1em 0;"
++      >
++        ${svgContent}
++      </div>
++    `;
++  },
++
+   updateBlockFromSource: (currentBlock: Block, rawSource: string, blockId: string): Block => {
+     const newCustomData = DrawingModule.parseContent!(rawSource, blockId);
+ 
+diff --git a/src/application/modules/palette/PaletteRenderer.tsx b/src/application/modules/palette/PaletteRenderer.tsx
+index 1ceff42..0582ab5 100644
+--- a/src/application/modules/palette/PaletteRenderer.tsx
++++ b/src/application/modules/palette/PaletteRenderer.tsx
+@@ -1,11 +1,8 @@
+ import React, { useState, useCallback, useEffect, useRef } from 'react';
+-import type { Block } from '@/application/logic/markdownParser';
+-import type { UpdateStrategyPayload } from '@/application/hooks/useBlocksManagement';
+ import type { BlockRendererProps } from '@/application/interfaces/blockModule';
+ import type { PaletteBlockData } from './paletteModule';
+ import PaletteModule from './paletteModule';
+ import { CoreBlockEditor } from '@/presentation/components/editor/CoreBlockEditor';
+-import { Edit3, Eye } from 'lucide-react';
+ import CustomColorPaletteRenderer from '@/presentation/components/markdown/CustomColorPaletteRenderer';
+ import type { ColorInfo } from '@/application/logic/markdownParser';
+ import { parsePaletteCodeContent } from '@/application/logic/markdownParser';
+@@ -113,24 +110,6 @@ export const PaletteRenderer: React.FC<PaletteRendererSpecificProps> = ({
+     }
+   }, [customData.rawSource, /*customData.colors,*/ onCancel, updatePreview]); // customData.colors n'est plus n├®cessaire ici car updatePreview s'en charge
+ 
+-  const toggleEditMode = () => {
+-    const nextIsEditingSource = !isEditingSource;
+-    const currentActualSource = customData.rawSource || PaletteModule.defaultRawContent || '';
+-    
+-    if (nextIsEditingSource) {
+-      setIsEditingSource(true);
+-      setInitialContentForEditor(currentActualSource);
+-      currentEditingSourceRef.current = currentActualSource;
+-      // Mettre ├á jour la preview avec le contenu actuel au d├®but de l'├®dition
+-      updatePreview(currentActualSource);
+-      setEditorKey(prevKey => prevKey + 1);
+-      if (propOnStartEdit) propOnStartEdit(block.id);
+-    } else {
+-      setIsEditingSource(false);
+-      updatePreview(currentActualSource); // S'assurer que la preview est ├á jour si on sort
+-      if (onCancel) onCancel(); 
+-    }
+-  };
+ 
+   const indentationPadding = `${((block.metadata as { indentationLevel?: number })?.indentationLevel ?? 0) * 1.5}rem`;
+ 
+diff --git a/src/application/modules/space/SpaceRenderer.tsx b/src/application/modules/space/SpaceRenderer.tsx
+index 7b04180..8f0d607 100644
+--- a/src/application/modules/space/SpaceRenderer.tsx
++++ b/src/application/modules/space/SpaceRenderer.tsx
+@@ -9,9 +9,6 @@ const logger = new PinoLogger();
+ export const SpaceRenderer: React.FC<BlockRendererProps<SpaceBlockData>> = ({
+   block,
+   customData,
+-  isEditing, // Peut ├¬tre utilis├® pour afficher des poign├®es de redimensionnement, etc.
+-  onUpdateBlockContent, // Pour sauvegarder la nouvelle hauteur en markdown
+-  onStartEdit // Pour entrer en mode ├®dition si on a un ├®diteur sp├®cifique
+ }) => {
+   const { height, originalInput } = customData;
+ 
+diff --git a/src/application/modules/space/spaceBlockModule.ts b/src/application/modules/space/spaceBlockModule.ts
+index 8665378..652d654 100644
+--- a/src/application/modules/space/spaceBlockModule.ts
++++ b/src/application/modules/space/spaceBlockModule.ts
+@@ -1,7 +1,6 @@
+ // src/application/modules/space/spaceBlockModule.ts
+ 
+-import type { BlockModule, BlockEditorProps } from '../../interfaces/blockModule';
+-import type { Block } from '../../logic/markdownParser';
++import type { BlockModule } from '../../interfaces/blockModule';
+ import { SpaceRenderer } from './SpaceRenderer';
+ import { PinoLogger } from '../../../infrastructure/logging/PinoLogger'; // Ajuster le chemin si n├®cessaire
+ import { Maximize } from 'lucide-react'; // AJOUT: Importer l'ic├┤ne
+diff --git a/src/application/state/uiStore.ts b/src/application/state/uiStore.ts
+index 04c73a2..62c310d 100644
+--- a/src/application/state/uiStore.ts
++++ b/src/application/state/uiStore.ts
+@@ -4,7 +4,7 @@ import { create } from 'zustand';
+ type AppMode = 'normal' | 'admin';
+ 
+ // Type pour les th├¿mes possibles
+-type Theme = 'light' | 'dark';
++type Theme = 'light' | 'dark' | 'printer';
+ 
+ // D├®finir le type pour l'├®tat global de l'UI
+ interface UiState {
+@@ -21,7 +21,7 @@ export const useUiStore = create<UiState>((set) => ({
+   appMode: 'normal', // Mode UI initial
+   // Action pour basculer le th├¿me
+   toggleTheme: () => set((state) => ({ 
+-    theme: state.theme === 'light' ? 'dark' : 'light' 
++    theme: state.theme === 'light' ? 'dark' : state.theme === 'dark' ? 'printer' : 'light' 
+   })),
+   setAppMode: (mode) => 
+     set(() => ({
+diff --git a/src/main.tsx b/src/main.tsx
+index a0f458a..34c48d1 100644
+--- a/src/main.tsx
++++ b/src/main.tsx
+@@ -2,6 +2,7 @@ import React from 'react';
+ import ReactDOM from 'react-dom/client';
+ import App from './App.tsx';
+ import './styles/index.css';
++import './presentation/styles/printer-theme.css';
+ 
+ // Cibler l'├®l├®ment racine (s'assurer qu'il existe dans index.html, souvent 'root')
+ const rootElement = document.getElementById('root');
+diff --git a/src/presentation/components/MarkdownRenderer.tsx b/src/presentation/components/MarkdownRenderer.tsx
+index 11357a8..2ef01b9 100644
+--- a/src/presentation/components/MarkdownRenderer.tsx
++++ b/src/presentation/components/MarkdownRenderer.tsx
+@@ -22,7 +22,7 @@ interface MarkdownRendererProps {
+   handleAddSummaryBlock: () => void;
+ }
+ 
+-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, isSelectionModeActive, selectedBlockIds, onToggleBlockSelection, setSelectedBlocksBatch, onDeleteBlock, onAddBlockAfter, onAddDropZoneBlockAfter, onUpdateBlockContent, onIncreaseIndentation, onDecreaseIndentation, handleAddSummaryBlock }) => {
++const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, isSelectionModeActive, selectedBlockIds, onToggleBlockSelection, setSelectedBlocksBatch, onDeleteBlock, onAddBlockAfter, onAddDropZoneBlockAfter, onUpdateBlockContent, onIncreaseIndentation, onDecreaseIndentation }) => {
+   logger.debug('[MarkdownRenderer] Rendering blocks:', blocks);
+ 
+   if (!blocks) {
+@@ -174,14 +174,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, isSelection
+         isSelectionModeActive={isSelectionModeActive}
+         selectedBlockIds={selectedBlockIds}
+         onToggleBlockSelection={onToggleBlockSelection}
++        listIndex={listIndex}
+         onDelete={onDeleteBlock}
+         onAddBlockAfter={onAddBlockAfter}
+         onAddDropZoneBlockAfter={onAddDropZoneBlockAfter}
+-        onUpdateBlockContent={onUpdateBlockContent}
+-        listIndex={listIndex}
++        onUpdateBlockContent={onUpdateBlockContent as any}
+         onIncreaseIndentation={onIncreaseIndentation}
+         onDecreaseIndentation={onDecreaseIndentation}
+-        handleAddSummaryBlock={handleAddSummaryBlock}
+       />
+     );
+   });
+@@ -199,6 +198,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, isSelection
+         className="relative"
+       >
+         {elementsToRender}
++        <div id="nova-editor-bottom-spacer" style={{ height: '144px' }} />
++
+         {isMarqueeSelecting && marqueeRect && (
+           <div style={{
+             position: 'absolute',
+diff --git a/src/presentation/components/SortableBlockItem.tsx b/src/presentation/components/SortableBlockItem.tsx
+index b638388..33868c5 100644
+--- a/src/presentation/components/SortableBlockItem.tsx
++++ b/src/presentation/components/SortableBlockItem.tsx
+@@ -1,4 +1,4 @@
+-import React, { useMemo} from 'react';
++import React, { useMemo } from 'react';
+ import { useSortable } from '@dnd-kit/sortable';
+ import { CSS } from '@dnd-kit/utilities';
+ import type { Block, ParagraphBlock, HeadingBlock, ListItemBlock, CodeBlock, BlockquoteBlock, ImageBlock, MermaidBlock, TableBlock, HTMLBlock, ThematicBreakBlock, DropZoneBlock } from '../../application/logic/markdownParser';
+@@ -20,6 +20,8 @@ const logger = new PinoLogger();
+ // Interface pour les props de SortableBlockItem
+ interface SortableBlockItemProps {
+   block: Block;
++  isSelectionModeActive: boolean;
++  selectedBlockIds: string[];
+   listIndex?: number; // Index dans la liste pour r├®f├®rence
+   index: number; // Index pour react-sortable-hoc ou dnd-kit
+   onAddBlockAfter: (data: { afterId: string; newBlock: Block }) => void; 
+@@ -31,6 +33,8 @@ interface SortableBlockItemProps {
+ 
+ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({ 
+   block, 
++  isSelectionModeActive,
++  selectedBlockIds,
+   listIndex, 
+   index, 
+   onUpdateBlockContent, 
+@@ -40,6 +44,8 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({
+ }) => {
+   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+ 
++  const isSelected = useMemo(() => selectedBlockIds.includes(block.id), [selectedBlockIds, block.id]);
++
+   const style = {
+     // Utilisation de translate3d pour potentiellement de meilleures performances
+     transform: CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
+@@ -92,7 +98,12 @@ export const SortableBlockItem: React.FC<SortableBlockItemProps> = ({
+   return (
+     <div ref={setNodeRef} style={style} className={`sortable-item flex items-start group relative mb-1 ${isDragging ? 'shadow-lg' : ''}`}>
+       {/* Drag Handle (Listeners attach├®s ici) */}
+-      <div {...listeners} className="drag-handle p-1 cursor-grab active:cursor-grabbing touch-none text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
++      <div
++        {...listeners}
++        className={`drag-handle p-1 cursor-grab active:cursor-grabbing touch-none text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-opacity ${
++          (isSelectionModeActive && isSelected) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
++        }`}
++      >
+         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+         </svg>
+diff --git a/src/presentation/components/dnd/SortableBlockItem.tsx b/src/presentation/components/dnd/SortableBlockItem.tsx
+index 1125fba..d5aa6b3 100644
+--- a/src/presentation/components/dnd/SortableBlockItem.tsx
++++ b/src/presentation/components/dnd/SortableBlockItem.tsx
+@@ -93,7 +93,7 @@ const SortableBlockItemComponent = forwardRef<HTMLDivElement, SortableBlockItemP
+   onDecreaseIndentation,
+   handleAddSummaryBlock,
+   listIndex,
+-}, ref) => {
++}, _ref) => {
+   const [isPrimarySelectorOpen, setIsPrimarySelectorOpen] = useState(false);
+   const [isMarkerSelectorOpen, setIsMarkerSelectorOpen] = useState(false);
+   const addButtonRef = useRef<HTMLButtonElement>(null);
+diff --git a/src/presentation/components/editor/CoreBlockEditor.tsx b/src/presentation/components/editor/CoreBlockEditor.tsx
+index 279b447..0a9f857 100644
+--- a/src/presentation/components/editor/CoreBlockEditor.tsx
++++ b/src/presentation/components/editor/CoreBlockEditor.tsx
+@@ -1,9 +1,8 @@
+ import React, { useCallback } from 'react';
+-import { useBlockEditor, type LanguageMode, type InlineFormatType, type CoreBlockEditorProps, type InlineMenuState } from '../../../application/hooks/useBlockEditor';
++import { useBlockEditor, type InlineFormatType, type CoreBlockEditorProps } from '../../../application/hooks/useBlockEditor';
+ import Button from '../base/Button';
+ import { PinoLogger } from '../../../infrastructure/logging/PinoLogger';
+-import { EditorView } from '@codemirror/view';
+-import InlineFormatMenu from './InlineFormatMenu';
++import InlineFormatMenu from './InlineFormatMenu'; // D├®comment├®
+ 
+ const logger = new PinoLogger();
+ 
+@@ -23,12 +22,8 @@ const CoreBlockEditor: React.FC<CoreBlockEditorProps> = (props) => {
+     initialContent,
+     onSave,
+     onCancel,
+-    languageMode,
+-    placeholder,
+-    autoFocus,
+     singleLine,
+     enableInlineFormatting,
+-    onContentChange,
+     hideInternalControls,
+     // Props optionnelles de CoreBlockEditorProps qui ont des valeurs par d├®faut dans useBlockEditor
+     // ou qui ne sont pas utilis├®es par CoreBlockEditor lui-m├¬me directement pour le rendu des contr├┤les.
+@@ -63,7 +58,7 @@ const CoreBlockEditor: React.FC<CoreBlockEditorProps> = (props) => {
+     isVisible: inlineMenuState.show,
+     top: inlineMenuState.top,
+     left: inlineMenuState.left,
+-    hasSelection: inlineMenuState.show,
++    hasSelection: inlineMenuState.hasSelection, // Utilisation correcte de .hasSelection
+     onClose: closeInlineMenu,
+     onFormat: applyInlineFormat,
+   };
+diff --git a/src/presentation/components/editor/InlineFormatMenu.tsx b/src/presentation/components/editor/InlineFormatMenu.tsx
+index 2b04e89..946041e 100644
+--- a/src/presentation/components/editor/InlineFormatMenu.tsx
++++ b/src/presentation/components/editor/InlineFormatMenu.tsx
+@@ -63,24 +63,24 @@ const InlineFormatMenu: React.FC<InlineFormatMenuProps> = ({
+       onMouseDown={(e) => e.stopPropagation()} 
+       role="menu"
+     >
+-      {/* Test: Limiter temporairement les types pour voir si l'erreur dispara├«t */}
++      {/* Boutons toujours visibles (ou presque) */}
+       <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'bold')} title="Gras (Ctrl+B)">G</button>
+       <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'italic')} title="Italique (Ctrl+I)">I</button>
+-      {hasSelection && (
+-          <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'code')} title="Code Inline">{`< >`}</button>
+-      )}
+-      {/* Les autres boutons sont comment├®s pour le test
++
++      {/* Boutons qui d├®pendent de si du texte est s├®lectionn├® ou non */}
+       {hasSelection ? (
+         <>
++          {/* Appara├«t si du texte est s├®lectionn├® */}
++          <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'code')} title="Code Inline">{`< >`}</button>
+           <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'strikethrough')} title="Barr├®">S</button>
+         </>
+       ) : (
+         <>
++          {/* Appara├«t si pas de s├®lection (pour ins├®rer un nouvel ├®l├®ment) */}
+           <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'link')} title="Ins├®rer Lien">Lien</button>
+           <button style={buttonStyle} onMouseDown={(e) => handleFormatAction(e, 'image')} title="Ins├®rer Image">Image</button>
+         </>
+       )}
+-      */}
+     </div>
+   );
+ };
+diff --git a/src/presentation/components/layout/Header.tsx b/src/presentation/components/layout/Header.tsx
+index a4227e0..567dbd4 100644
+--- a/src/presentation/components/layout/Header.tsx
++++ b/src/presentation/components/layout/Header.tsx
+@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
+ import { useUiStore } from '../../../application/state/uiStore';
+ import { useAuthStore } from '../../../application/state/authStore';
+ import HelpModal from './HelpModal';
+-import Button from '../base/Button';
+ import { Download } from 'lucide-react'; // Supprim├®: Trash2, Rows, CheckSquare
+ 
+ import logoImage from '@/assets/images/nova.svg';
+@@ -18,7 +17,6 @@ interface HeaderProps {
+ const Header: React.FC<HeaderProps> = ({
+   onLoadMarkdown,
+   onExport,
+-  hasUnsavedChanges,
+ }) => {
+   const { theme, toggleTheme, appMode, setAppMode } = useUiStore();
+   const { user, isLoading, error, signInWithGoogle, logout } = useAuthStore();
+@@ -95,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({
+     <header className="bg-gradient-to-r from-blue-900 via-red-700 to-yellow-500 text-white p-3 shadow-md flex justify-between items-center print:hidden">
+       <div className="flex items-center font-bold text-lg tracking-wide">
+         <img src={logoImage} alt="Logo Nova" height="48" className="h-12 mr-2" />
+-        <span className="text-xl font-semibold text-gray-800 dark:text-gray-200">Nova</span>
++        <span className="text-xl font-semibold text-white dark:text-gray-200">Nova</span>
+       </div>
+ 
+       <div className="flex items-center">
+diff --git a/src/presentation/components/layout/MainContent.tsx b/src/presentation/components/layout/MainContent.tsx
+index b4f6e13..94d782a 100644
+--- a/src/presentation/components/layout/MainContent.tsx
++++ b/src/presentation/components/layout/MainContent.tsx
+@@ -28,7 +28,7 @@ const MainContent: React.FC<MainContentProps> = ({ children }) => {
+   */
+ 
+   return (
+-    <main className="flex-grow container mx-auto p-4">
++    <main className="flex flex-col flex-grow container mx-auto p-4">
+       {/* Supprimer le rendu ReactMarkdown statique */}
+       {/* 
+       <div className="prose dark:prose-invert lg:prose-xl max-w-none">
+diff --git a/src/presentation/components/markdown/CustomParagraphRenderer.tsx b/src/presentation/components/markdown/CustomParagraphRenderer.tsx
+index 629ffd9..f6a30d4 100644
+--- a/src/presentation/components/markdown/CustomParagraphRenderer.tsx
++++ b/src/presentation/components/markdown/CustomParagraphRenderer.tsx
+@@ -76,8 +76,6 @@ const CustomParagraphRendererComponent = forwardRef<
+     setIsEditing(false);
+   }, [blockId]);
+ 
+-  const handleBlockIndent = onIncreaseIndentation ? () => onIncreaseIndentation(blockId) : undefined;
+-  const handleBlockOutdent = onDecreaseIndentation ? () => onDecreaseIndentation(blockId) : undefined;
+ 
+   const handleClick = useCallback(() => {
+     setIsEditing(true);
+diff --git a/src/presentation/components/markdown/DrawingRenderer.tsx b/src/presentation/components/markdown/DrawingRenderer.tsx
+index 745756f..728ed74 100644
+--- a/src/presentation/components/markdown/DrawingRenderer.tsx
++++ b/src/presentation/components/markdown/DrawingRenderer.tsx
+@@ -1,12 +1,11 @@
+ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+-import type { Block } from '@/application/logic/markdownParser';
+ import type { BlockRendererProps } from '@/application/interfaces/blockModule';
+ import type { DrawingBlockData } from '@/application/modules/drawing/types';
+ import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+ import fitCurve from 'fit-curve';
+ import { bezierCurvesToSVGPath } from '@/application/modules/drawing/drawingModule';
+ import Button from '@/presentation/components/base/Button';
+-import { Undo2, Check, Edit2, Save, CircleSlash, Settings2, Palette as PaletteIcon, Eraser } from 'lucide-react';
++import { Undo2, Check, Save, CircleSlash, Settings2, Eraser } from 'lucide-react';
+ 
+ const logger = new PinoLogger();
+ 
+@@ -33,13 +32,7 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
+     customData,
+     onSave: propOnSave,
+     onStartEdit: propOnStartEdit,
+-    onCancel: propOnCancel,
+     theme,
+-    onUpdateBlockContent,
+-    onDeleteBlock,
+-    onAddBlockAfter,
+-    onIncreaseIndentation,
+-    onDecreaseIndentation,
+   } = props;
+ 
+   const svgRef = useRef<SVGSVGElement>(null);
+diff --git a/src/presentation/hooks/useBlockEditor.ts b/src/presentation/hooks/useBlockEditor.ts
+index c745ae0..cd62465 100644
+--- a/src/presentation/hooks/useBlockEditor.ts
++++ b/src/presentation/hooks/useBlockEditor.ts
+@@ -316,7 +316,7 @@ export function useBlockEditor({
+       languageCompartment.of(getLanguageExtension(languageMode)),
+       keymap.of([
+         {
+-          key: 'Mod-Enter',
++/*           key: 'Mod-Enter',
+           run: (targetViewInstance) => {
+             // Mod-Enter sauvegarde toujours le contenu
+             console.log(`[useBlockEditor ${blockId} - EditorView ${currentEditorInstanceId}] Mod-Enter pressed (save).`);
+@@ -327,7 +327,7 @@ export function useBlockEditor({
+               console.warn(`[useBlockEditor ${blockId} - EditorView ${currentEditorInstanceId}] viewRef.current, its state, or doc is null on Mod-Enter (save).`);
+             }
+             return true; // Emp├¬che le comportement par d├®faut
+-          },
++          }, */
+         },
+         {
+           key: 'Enter',

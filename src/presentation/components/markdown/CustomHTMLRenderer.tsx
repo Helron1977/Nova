@@ -5,11 +5,8 @@ import type { HTMLBlock } from '@/application/logic/markdownParser';
 interface CustomHTMLRendererProps {
   block: HTMLBlock;
   style?: React.CSSProperties;
-  onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number;
   index?: number;
-  onIncreaseIndentation?: (blockId: string) => void;
-  onDecreaseIndentation?: (blockId: string) => void;
   [key: string]: any; // Pour props DND/data-*
 }
 
@@ -20,11 +17,8 @@ const CustomHTMLRenderer = React.forwardRef<
 >(({ 
   block, 
   style, 
-  onUpdateBlockContent,
   listIndex,
   index,
-  onIncreaseIndentation,
-  onDecreaseIndentation,
   ...rest 
 }, ref) => {
   const { html } = block.content;

@@ -1,17 +1,27 @@
 @import "tailwindcss";
-
+@custom-variant dark (&:where(.dark, .dark *));
 /* Styles personnalisés pour le plugin prose (typography) */
 @layer base {
     /* --- Fond style Bloc-notes --- */
     body {
-      background-color: #f8f8f0 !important; /* Ajouter !important par précaution */
-      /* Lignes horizontales légères */
+      background-color: #f8f8f0 !important;
       background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px) !important;
-      background-size: 100% 1.5em !important; /* Espacement des lignes (ajuster si besoin) */
-      /* Optionnel: Marge rouge sur le côté */
-      /* border-left: 3px solid rgba(255, 0, 0, 0.4); */
+      background-size: 100% 1.5em !important;
+      color: #333;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
 
+    html.dark body {
+      background-color: #0f172a !important; /* slate-900 */
+      background-image: none !important;
+      color: #f8fafc !important; /* slate-50 */
+    }
+
+    html.printer-theme body {
+      background-color: #ffffff !important;
+      background-image: none !important;
+      color: #000000 !important;
+    }
     /* --- Fin Fond style Bloc-notes --- */
 
     /* Améliorations pour les listes de tâches */
@@ -34,7 +44,38 @@
         margin-left: -1.25rem;
         padding-left: 0px;
     }
+
+    /* Réinitialisation spécifique pour les titres dans .prose */
+    /* pour contrer le font-size: inherit de Preflight */
+    .prose h1,
+    .prose h2,
+    .prose h3,
+    .prose h4,
+    .prose h5,
+    .prose h6 {
+        font-size: revert;
+        font-weight: revert;
+    }
 }
+
+/* --- Classes d'indentation pour tous les types de blocs --- */
+/* Ces classes ajoutent un padding-left progressif pour créer une indentation visuelle */
+.indent-level-1 {
+  padding-left: 1.5rem !important; /* ~24px */
+}
+.indent-level-2 {
+  padding-left: 3rem !important; /* ~48px */
+}
+.indent-level-3 {
+  padding-left: 4.5rem !important; /* ~72px */
+}
+.indent-level-4 {
+  padding-left: 6rem !important; /* ~96px */
+}
+.indent-level-5 {
+  padding-left: 7.5rem !important; /* ~120px */
+}
+/* --- Fin des classes d'indentation --- */
 
 /* --- Assurer la transparence de l'élément racine React --- */
 #root {
@@ -107,7 +148,7 @@
 
 /* Blockquote */
 .prose [data-dnd-wrapper] blockquote {
-   @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-6;
+  @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-6;
 }
 
 /* Code Blocks */
@@ -153,4 +194,6 @@
 /* Styles spécifiques pour ol déjà inclus via la règle générale ul, ol et la règle > ol */
 
 /* Ajouter ici d'autres éléments si nécessaire (strong, em...) */
+/* --- Fin des styles copiés/personnalisés --- */ 
+
 /* --- Fin des styles copiés/personnalisés --- */ 

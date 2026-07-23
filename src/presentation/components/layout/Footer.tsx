@@ -1,109 +1,57 @@
-import React, {useRef } from 'react';
-// Supprimer tous les imports CodeMirror
-// import { EditorState, ChangeSpec } from '@codemirror/state';
-// import { EditorView, keymap } from '@codemirror/view';
-// import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-// import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-// import { languages } from '@codemirror/language-data';
-// import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-// import { tags as t } from '@lezer/highlight';
-// Optionnel : Importer un thème de base ou créer le vôtre
-// import { oneDark } from '@codemirror/theme-one-dark'; 
+import React from 'react';
+import { useUiStore } from '../../../application/state/uiStore';
+import { FileText, LayoutGrid, Cloud, CloudOff, Moon, Sun } from 'lucide-react';
 
-// Supprimer thème et highlighting
-/*
-const baseTheme = EditorView.theme({
-  "&": {
-    color: "#000", // Couleur de texte par défaut
-    backgroundColor: "#fff" // Fond blanc
-  },
-  ".cm-content": {
-    caretColor: "#000" // Couleur du curseur
-  },
-  "&.cm-focused .cm-cursor": {
-    borderLeftColor: "#000" // Couleur du curseur quand focus
-  },
-  "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "#d7d4f0" // Couleur de fond de sélection
-  },
-  ".cm-gutters": { // Si jamais on ajoute les gouttières plus tard
-    backgroundColor: "#f5f5f5",
-    color: "#999",
-    border: "none"
-  }
-}, {dark: false}); // Spécifier que c'est un thème clair
+interface FooterProps {
+  blockCount: number;
+  wordCount: number;
+  hasUnsavedChanges: boolean;
+}
 
-// Style de coloration syntaxique minimal pour Markdown
-const markdownHighlighting = HighlightStyle.define([
-  { tag: t.heading1, class: "text-2xl font-bold" },
-  { tag: t.heading2, class: "text-xl font-semibold" },
-  { tag: [t.heading3, t.heading4], class: "text-lg font-medium" },
-  { tag: t.strong, fontWeight: "bold" },
-  { tag: t.emphasis, fontStyle: "italic" },
-  { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: t.link, color: "#0366d6", textDecoration: "underline" },
-  { tag: t.monospace, fontFamily: "var(--font-mono)", color: "#d73a49" }, // Code inline / Bloc code
-  { tag: t.comment, color: "#6a737d" }, // Pour les commentaires dans les blocs de code
-  { tag: t.meta, color: "#6a737d" }, // Ex: Les \`\`\` dans les blocs code
-  { tag: t.keyword, color: "#d73a49" }, // Mots clés dans code
-  { tag: t.string, color: "#032f62" }, // Strings dans code
-  { tag: t.url, color: "#0366d6" },
-  { tag: t.list, color: "#e36209" } // Marqueurs de liste
-]);
-
-const sampleMarkdown = `
-# Test CodeMirror
-
-Ceci est un *paragraphe* avec **différents** formats :
-
-- Liste 1
-- Liste 2
-
-\`\`\`javascript
-console.log('hello world!');
-\`\`\`
-
-[Un lien](https://codemirror.net)
-\`code inline\` ~~barré~~\n`;
-*/
-
-// Supprimer le composant SimpleContextMenu (s'il n'est utilisé nulle part ailleurs)
-/*
-interface MenuAction {...}
-interface SimpleContextMenuProps {...}
-const SimpleContextMenu: React.FC<SimpleContextMenuProps> = (...) => { ... };
-*/
-
-const Footer: React.FC = () => {
-  // Supprimer refs et state liés à CodeMirror
-  // const editorRef = useRef<HTMLDivElement>(null);
-  // const viewRef = useRef<EditorView | null>(null);
-  const footerRef = useRef<HTMLElement | null>(null);
-  // const [menuState, setMenuState] = useState<{...}>({...});
-
-  // Supprimer le useEffect lié à CodeMirror
-  // useEffect(() => {
-    // ... contenu supprimé ...
-  // }, []);
-
-  // Supprimer les fonctions utilitaires liées à CodeMirror
-  // const closeMenu = useCallback(() => { ... }, []);
-  // const applyOrInsertMarkers = useCallback((...) => { ... }, []);
-  // const handleLink = useCallback(() => { ... }, []);
-  // const menuActions = useMemo((): MenuAction[] => { ... }, [...]);
+const Footer: React.FC<FooterProps> = ({ blockCount, wordCount, hasUnsavedChanges }) => {
+  const { theme, appMode } = useUiStore();
 
   return (
-    <footer
-      ref={footerRef}
-      className="bg-gray-100 dark:bg-gray-800 p-4 mt-auto flex flex-col items-center relative"
-      style={{ minHeight: '50px' }} // Réduire la hauteur min maintenant ?
-    >
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Nova Footer
-      </p>
-      {/* Supprimer le JSX lié à CodeMirror */}
+    <footer className="print:hidden bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-1.5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+      {/* Left: document stats */}
+      <div className="flex items-center gap-4">
+        <span className="flex items-center gap-1.5" title="Nombre de blocs">
+          <LayoutGrid size={12} className="opacity-70" />
+          {blockCount} bloc{blockCount !== 1 ? 's' : ''}
+        </span>
+        <span className="flex items-center gap-1.5" title="Nombre de mots (estimé)">
+          <FileText size={12} className="opacity-70" />
+          {wordCount} mot{wordCount !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Center: save indicator */}
+      <div className="flex items-center gap-1.5">
+        {hasUnsavedChanges ? (
+          <>
+            <CloudOff size={13} className="text-amber-500" />
+            <span className="text-amber-600 dark:text-amber-400 font-medium">Modifications non sauvegardées</span>
+          </>
+        ) : (
+          <>
+            <Cloud size={13} className="text-green-500" />
+            <span className="text-green-600 dark:text-green-400">Sauvegardé</span>
+          </>
+        )}
+      </div>
+
+      {/* Right: mode + theme */}
+      <div className="flex items-center gap-3">
+        <span className={`capitalize px-1.5 py-0.5 rounded text-[10px] font-semibold ${appMode === 'admin' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+          {appMode}
+        </span>
+        <span className="flex items-center gap-1">
+          {theme === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
+          {theme === 'dark' ? 'Sombre' : 'Clair'}
+        </span>
+      </div>
     </footer>
   );
 };
 
-export default Footer; 
+export default Footer;

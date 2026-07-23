@@ -4,7 +4,7 @@ import { create } from 'zustand';
 type AppMode = 'normal' | 'admin';
 
 // Type pour les thèmes possibles
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'printer';
 
 // Définir le type pour l'état global de l'UI
 interface UiState {

@@ -1,0 +1,59 @@
+.printer-theme {
+  --background-color: white;
+  --text-color: black;
+  /* Autres variables de couleur pour le thème imprimante */
+}
+
+.printer-styles {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    #e6f2e6,     /* Vert clair */
+    #e6f2e6 20px, /* Hauteur de la bande verte */
+    white 20px,   /* Couleur de la bande blanche */
+    white 40px    /* Hauteur totale de la bande (verte + blanche), pattern repeats */
+  );
+  color: var(--text-color, black); /* Couleur de texte par défaut */
+  font-family: 'Courier New', Courier, monospace; /* Police de machine à écrire */
+}
+
+/* Cibler le conteneur du contenu principal dans App.tsx lorsque le thème printer est actif */
+.printer-theme .flex.flex-col.flex-grow.h-full.max-w-4xl.mx-auto.w-full.min-h-0 {
+  position: relative; /* Nécessaire pour positionner les pseudo-éléments */
+  /* Ajouter un padding pour faire de la place aux perforations si nécessaire, 
+     mais on va d'abord essayer de les positionner à l'extérieur. */
+}
+
+.printer-theme .flex.flex-col.flex-grow.h-full.max-w-4xl.mx-auto.w-full.min-h-0::before,
+.printer-theme .flex.flex-col.flex-grow.h-full.max-w-4xl.mx-auto.w-full.min-h-0::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25px; /* Largeur de la bande de perforation */
+  background-color: white; /* La bande de perforation est blanche */
+  background-image: repeating-radial-gradient(
+    circle at center,
+    #b0b0b0 0,       /* Couleur du trou */
+    #b0b0b0 3px,      /* Rayon du trou */
+    transparent 3.5px, /* Zone transparente autour du trou pour montrer le fond blanc de la bande */
+    transparent 15px   /* Espacement vertical total pour un trou + espace */
+  );
+  background-size: 100% 15px; /* Répéter le motif sur toute la hauteur */
+  z-index: 0; /* S'assurer qu'elles sont derrière le contenu principal mais au-dessus du fond rayé de la page si possible, sinon z-index: -1 sur le fond rayé */
+}
+
+.printer-theme .flex.flex-col.flex-grow.h-full.max-w-4xl.mx-auto.w-full.min-h-0::before {
+  right: 100%; /* Placer juste à gauche du conteneur de contenu */
+  margin-right: 5px; /* Petit espace entre la perforation et le contenu */
+}
+
+.printer-theme .flex.flex-col.flex-grow.h-full.max-w-4xl.mx-auto.w-full.min-h-0::after {
+  left: 100%; /* Placer juste à droite du conteneur de contenu */
+  margin-left: 5px; /* Petit espace entre la perforation et le contenu */
+}
+
+/* Styles spécifiques pour le contenu lorsque le thème imprimante est actif */
+.printer-theme .your-content-class {
+  /* Exemple: changer la couleur de fond d'un élément spécifique */
+  /* background-color: var(--another-color); */
+} 

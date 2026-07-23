@@ -1,87 +1,84 @@
-import type { Block } from './markdownParser';
-import type { InlineElement } from './markdownParser';
-import type { TextInline } from './markdownParser';
-import type { StrongInline } from './markdownParser';
-import type { EmphasisInline } from './markdownParser';
-import type { HTMLInline } from './markdownParser';
-import type { LinkInline } from './markdownParser';
-import type { InlineCodeElement } from './markdownParser';
-import type { DeleteInline } from './markdownParser';
-import type { HeadingBlock } from './markdownParser';
-import type { ParagraphBlock } from './markdownParser';
-import type { ListItemBlock } from './markdownParser';
-import type { CodeBlock } from './markdownParser';
-import type { MermaidBlock } from './markdownParser';
-import type { ImageBlock } from './markdownParser';
-import type { BlockquoteBlock } from './markdownParser';
+import type { Block, ListItemBlock, CodeBlock, MermaidBlock, ImageBlock, BlockquoteBlock, TableBlock, HTMLBlock, HeadingBlock, ParagraphBlock, InlineElement, TextInline, StrongInline, EmphasisInline, HTMLInline, LinkInline, InlineCodeElement, DeleteInline } from './markdownParser';
+import { serializeListItemToMarkdown } from './markdownParser'; // Correction: Importé comme valeur
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // import type { ThematicBreakBlock } from './markdownParser'; // Supprimé car non utilisé
-import type { TableBlock } from './markdownParser';
-import type { HTMLBlock } from './markdownParser';
-import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+import { PinoLogger } from '../../infrastructure/logging/PinoLogger';
+import type { BlockModule } from '../interfaces/blockModule';
+
+// AJOUT: Importer les types et fonctions nécessaires pour les modules
+import { getBlockModuleByType } from './blockRegistry';
 
 const logger = new PinoLogger();
 
-// Helper pour sérialiser les éléments inline en Markdown
+// Helper pour sérialiser les éléments inline en Markdown (style fonctionnel)
 const renderInlineElementsToMarkdown = (elements: InlineElement[]): string => {
-    let markdownString = '';
-
-    elements.forEach(element => {
+    return elements
+      .map(element => {
         switch (element.type) {
             case 'text':
-                // Remplacer les \n littéraux par de vrais sauts de ligne
-                // Utiliser replace avec regex globale pour compatibilité
-                const textValue = (element as TextInline).value.replace(/\\n/g, '\n'); // Correction ici
-                markdownString += textValue;
-                break;
+                return (element as TextInline).value.replace(/\\n/g, '\n');
             case 'strong':
-                markdownString += `**${renderInlineElementsToMarkdown((element as StrongInline).children)}**`;
-                break;
+                return `**${renderInlineElementsToMarkdown((element as StrongInline).children)}**`;
             case 'emphasis':
-                markdownString += `*${renderInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
-                break;
+                return `*${renderInlineElementsToMarkdown((element as EmphasisInline).children)}*`;
             case 'inlineCode':
-                markdownString += `\`${(element as InlineCodeElement).value}\``;
-                break;
+                return `\`${(element as InlineCodeElement).value}\``;
             case 'link':
                 const link = element as LinkInline;
                 const linkText = renderInlineElementsToMarkdown(link.children);
-                const titlePart = link.title ? ` "${link.title}"` : '';
-                // *** CORRECTION CLÉ : Utiliser link.url directement ***
-                markdownString += `[${linkText}](${link.url}${titlePart})`; 
-                break;
+                const titlePart = link.title ? ` \"${link.title}\"` : '';
+                return `[${linkText}](${link.url}${titlePart})`; 
             case 'delete':
-                markdownString += `~~${renderInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
-                break;
+                return `~~${renderInlineElementsToMarkdown((element as DeleteInline).children)}~~`;
             case 'html':
-                // Le HTML inline est simplement ajouté tel quel
-                markdownString += (element as HTMLInline).value;
-                break;
+                return (element as HTMLInline).value;
             default:
                 logger.warn(`[renderInlineElementsToMarkdown] Unhandled inline element type: ${(element as any)?.type}`, { element });
-                break;
+                return ''; 
         }
-    });
-
-    return markdownString;
+    }).join('');
 };
 
 // Fonction principale pour sérialiser les blocs
 export const blocksToMarkdown = (blocks: Block[]): string => {
+    logger.debug(`[blocksToMarkdown] Starting serialization for ${blocks.length} blocks.`);
     let markdownOutput = '';
-    let currentListNumber = 1; // Pour suivre la numérotation des listes ordonnées
+    let currentListNumber = 1;
     let previousListDepth = -1;
     let previousListOrdered = false;
 
     blocks.forEach((block, index) => {
         let blockMarkdown = '';
         let indent = '';
+        const blockMetadata = block.metadata as any; // Pour un accès plus simple
         if (block.type === 'listItem') {
-            // Indentation des listes basée sur leur depth
-            indent = '  '.repeat((block as ListItemBlock).metadata.depth);
-        } else if (block.metadata?.indentationLevel && block.metadata.indentationLevel > 0) {
-            // Indentation des autres blocs basée sur indentationLevel
-            indent = '  '.repeat(block.metadata.indentationLevel);
+            // Pour les listes, l'indentation est basée sur la profondeur (depth)
+            indent = '    '.repeat(blockMetadata.depth ?? 0); // Utiliser 4 espaces par niveau de profondeur
+        } else if (blockMetadata?.indentationLevel && blockMetadata.indentationLevel > 0) {
+            // Pour les autres blocs, utiliser indentationLevel s'il existe
+            indent = '  '.repeat(blockMetadata.indentationLevel);
+        }
+
+        const customBlockType = blockMetadata?.customBlockType;
+        const originalLanguage = blockMetadata?.originalLanguage;
+
+        if (customBlockType && originalLanguage) {
+            const module = getBlockModuleByType(customBlockType) as BlockModule<any> | undefined;
+            if (module && module.serializeContent) {
+                if ((block as any).type === 'ai-message') return ''; // Ignore ghost block
+                const customContent = module.serializeContent((block.content as any).customBlockData);
+                if (customContent) {
+                    const language = (module as any).codeBlockLanguage || originalLanguage;
+                    blockMarkdown = `${indent}\`\`\`${language}\n${customContent}\n${indent}\`\`\``;
+                    if (index > 0) {
+                        markdownOutput += '\n\n';
+                    }
+                    markdownOutput += blockMarkdown;
+                    previousListDepth = -1;
+                    previousListOrdered = false;
+                    return;
+                }
+            }
         }
 
         switch (block.type) {
@@ -96,30 +93,34 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
 
             case 'listItem':
                 const listItem = block as ListItemBlock;
-                // Logique pour déterminer le marqueur (-, 1., etc.) et le préfixe de tâche
-                let marker: string;
+                const currentItemDepth = listItem.metadata.depth ?? 0;
+                // La fonction serializeListItemToMarkdown s'occupe du style de puce/checkbox et du contenu.
+                // Mais pour les listes ordonnées, nous devons gérer le numéro d'item ici.
+                const serializedItemBase = serializeListItemToMarkdown(listItem); // Ex: "1. [ ] Texte" ou "- Texte"
+
                 if (listItem.metadata.ordered) {
-                    // Mise à jour du compteur pour listes ordonnées
-                    if (listItem.metadata.depth > previousListDepth || !previousListOrdered) {
+                    // Réinitialiser le compteur si la profondeur change ou si on passe d'une liste non ordonnée à ordonnée
+                    if (currentItemDepth > previousListDepth || !previousListOrdered || currentItemDepth < previousListDepth) {
                         currentListNumber = 1;
-                    } else if (listItem.metadata.depth === previousListDepth) {
-                        currentListNumber++;
                     }
-                    // (pas de reset si depth < previousListDepth, géré implicitement)
-                    marker = `${currentListNumber}.`;
+                    // Extraire le contenu après le marqueur "1. " (ou ce que serializeListItemToMarkdown produit pour un item ordonné)
+                    // Ceci est un peu fragile si serializeListItemToMarkdown change son format exact pour "1. "
+                    let contentPart = serializedItemBase;
+                    if (serializedItemBase.startsWith('1. ')) {
+                        contentPart = serializedItemBase.substring(3); // Enlève "1. "
+                    } else if (serializedItemBase.startsWith('1.')) { // Au cas où il n'y aurait pas d'espace
+                         contentPart = serializedItemBase.substring(2); // Enlève "1."
+                    }
+                    
+                    blockMarkdown = `${indent}${currentListNumber}. ${contentPart}`;
+                    currentListNumber++; // Incrémenter pour le prochain item ordonné au même niveau
                     previousListOrdered = true;
                 } else {
-                    marker = '-';
-                    previousListOrdered = false;
+                    blockMarkdown = `${indent}${serializedItemBase}`;
+                    previousListOrdered = false; // Marquer que la dernière liste rencontrée n'était pas ordonnée
                 }
-                previousListDepth = listItem.metadata.depth;
-                
-                const checkedMarker = listItem.metadata.checked === true ? '[x]' : listItem.metadata.checked === false ? '[ ]' : null;
-                const taskListPrefix = checkedMarker ? `${checkedMarker} ` : '';
-                
-                // Construire le markdown du listItem en utilisant `indent` pré-calculé
-                blockMarkdown = `${indent}${marker} ${taskListPrefix}${renderInlineElementsToMarkdown(listItem.content.children)}`;
-                break; // Ne pas oublier le break
+                previousListDepth = currentItemDepth;
+                break;
 
             case 'code':
                 const codeBlock = block as CodeBlock;
@@ -130,7 +131,7 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
 
             case 'blockquote':
                 const quoteContent = renderInlineElementsToMarkdown((block as BlockquoteBlock).content.children);
-                // Assurer que l'indentation est appliquée avant le '>'
+                // Appliquer l'indentation à chaque ligne de la citation
                 blockMarkdown = quoteContent.split('\n').map(line => `${indent}> ${line}`).join('\n');
                 break;
 
@@ -147,14 +148,14 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                  const imageBlock = block as ImageBlock;
                  const alt = imageBlock.content.alt || '';
                  const title = imageBlock.content.title ? ` "${imageBlock.content.title}"` : '';
-                 // *** CORRECTION CLÉ : Utiliser imageBlock.content.src directement ***
-                 blockMarkdown = `${indent}![${alt}](${imageBlock.content.src}${title})`;
+                 blockMarkdown = `${indent}![${alt}](${imageBlock.content.url}${title})`;
                  break;
            
              case 'mermaid':
                  const mermaidBlock = block as MermaidBlock;
                  const mermaidLines = mermaidBlock.content.code.split('\n');
                  blockMarkdown = `${indent}\`\`\`mermaid\n${mermaidLines.map(line => indent + line).join('\n')}\n${indent}\`\`\``;
+                 logger.debug(`[blocksToMarkdown] Serialized MermaidBlock ID ${mermaidBlock.id}`);
                  break;
 
             case 'table':
@@ -163,76 +164,72 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
                 let headerRowMd = '';
                 let separatorRowMd = '';
                 let bodyRowsMd = '';
-
                 if (rows.length > 0) {
-                    // En-tête
                     headerRowMd = `| ${rows[0].map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`;
-                    
-                    // Séparateur
                     separatorRowMd = `|${align.map(alignment => {
                         switch (alignment) {
                             case 'center': return ' :---: ';
                             case 'right':  return ' ---: ';
-                            case 'left':
-                            default:         return ' --- '; // padEnd(5) pour assurer largeur minimale ?
+                            case 'left': default: return ' --- ';
                         }
                     }).join('|')}|`;
-
-                    // Corps - Générer chaque ligne SANS indentation ici
                     bodyRowsMd = rows.slice(1).map(row => 
                         `| ${row.map(cellContent => renderInlineElementsToMarkdown(cellContent).padEnd(3)).join(' | ')} |`
                     ).join('\n');
                 }
-
-                // Construire le markdown final en ajoutant l'indentation à CHAQUE ligne
                 const tableLines: string[] = [];
                 if (headerRowMd) {
-                    tableLines.push(`${indent}${headerRowMd}`);       // Indenter l'en-tête
-                    tableLines.push(`${indent}${separatorRowMd}`);    // Indenter le séparateur
+                    tableLines.push(`${indent}${headerRowMd}`);
+                    tableLines.push(`${indent}${separatorRowMd}`);
                     if (bodyRowsMd) {
-                        // Indenter chaque ligne du corps
                         tableLines.push(...bodyRowsMd.split('\n').map(line => `${indent}${line}`)); 
                     }
                 }
-                blockMarkdown = tableLines.join('\n'); // Joindre les lignes indentées
-
-                 // Réinitialiser l'état de la liste après une table
-                 previousListDepth = -1;
-                 previousListOrdered = false;
+                blockMarkdown = tableLines.join('\n');
+                previousListDepth = -1;
+                previousListOrdered = false;
                 break;
 
             default:
-                logger.warn(`[blocksToMarkdown] Unhandled block type: ${(block as any)?.type}`, { block });
-                blockMarkdown = `${indent}<!-- Unhandled block type: ${(block as any)?.type} -->`;
-                // Réinitialiser l'état de la liste après un bloc inconnu
+                logger.warn(`[blocksToMarkdown] Unhandled block type in switch: ${(block as any)?.type}`, { block });
+                blockMarkdown = `${indent}<!-- Unhandled block type in switch: ${(block as any)?.type} -->`;
                 previousListDepth = -1;
                 previousListOrdered = false;
                 break;
         }
         
-        // Gérer les sauts de ligne (Logique révisée)
         if (index > 0) {
             const prevBlock = blocks[index - 1];
-            // Ajouter deux sauts de ligne par défaut
             markdownOutput += '\n\n'; 
-
-            // Exception: Si le bloc actuel ET le précédent sont des listItems
-            // ET le bloc actuel n'est PAS moins indenté (il continue ou s'enfonce)
-            // alors on retire un saut de ligne (pour n'en laisser qu'un seul)
             if (block.type === 'listItem' && prevBlock.type === 'listItem') {
-                const currentDepth = (block as ListItemBlock).metadata.depth;
-                const prevDepth = (prevBlock as ListItemBlock).metadata.depth;
+                const currentDepth = (block as ListItemBlock).metadata.depth ?? 0;
+                const prevDepth = (prevBlock as ListItemBlock).metadata.depth ?? 0;
                 if (currentDepth >= prevDepth) {
-                    markdownOutput = markdownOutput.slice(0, -1); // Retire le dernier \n
-                    // Cas spécial: si on change de type de liste (ordonné/non ordonné) au même niveau,
-                    // certains parseurs aiment quand même un saut de ligne double.
-                    // Pour l'instant, on garde simple: un seul saut si même niveau ou plus profond.
+                    markdownOutput = markdownOutput.slice(0, -1);
                 }
             }
         }
-
         markdownOutput += blockMarkdown;
+
+        // Ajout des métadonnées de mise en page (layoutWidth) en commentaire HTML juste après le bloc
+        if (blockMetadata?.layoutWidth && blockMetadata.layoutWidth !== 'full') {
+            markdownOutput += `\n<!-- layout: ${blockMetadata.layoutWidth} -->`;
+        }
     });
 
-    return markdownOutput.trim(); 
-}; 
+    logger.debug("[blocksToMarkdown] Serialization finished.");
+    return markdownOutput;
+};
+
+// AJOUT: Fonction pour convertir un nombre en chiffres romains (simpliste)
+/* function toRoman(num: number): string {
+    if (num < 1 || num > 3999) return num.toString(); // Gestion simple des limites
+    const roman = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+    let str = '';
+    for (const i of Object.keys(roman) as Array<keyof typeof roman>) {
+        const q = Math.floor(num / roman[i]);
+        num -= q * roman[i];
+        str += i.repeat(q);
+    }
+    return str;
+}  */

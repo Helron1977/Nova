@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './styles/index.css';
+import './presentation/styles/printer-theme.css';
 
 // Cibler l'élément racine (s'assurer qu'il existe dans index.html, souvent 'root')
 const rootElement = document.getElementById('root');

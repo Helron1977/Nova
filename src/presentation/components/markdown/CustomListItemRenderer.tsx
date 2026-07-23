@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import type { ListItemBlock, InlineElement, TextInline } from '@/application/logic/markdownParser';
+import React, { useState, useCallback, useEffect } from 'react';
+import { type ListItemBlock, type InlineElement, type TextInline, markdownToBlocks } from '@/application/logic/markdownParser';
 import { renderInlineElements } from './InlineElementRenderer';
-import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
+import { CoreBlockEditor } from '@/presentation/components/editor/CoreBlockEditor';
 
-const logger = new PinoLogger();
+
+import { useEditorCommands } from '@/application/context/EditorContext';
 
 interface CustomListItemRendererProps {
   block: ListItemBlock;
-  onUpdateBlockContent?: (blockId: string, newText: string) => void;
   listIndex?: number;
 }
 
@@ -16,110 +16,92 @@ const getRawTextFromChildren = (children: InlineElement[] | undefined): string =
   return children.map(child => {
     switch (child?.type) {
       case 'text':
-      case 'inlineCode':
-      case 'html':
-        return (child as TextInline).value || '';
+        return (child as TextInline).rawMarkdown || (child as TextInline).value || '';
       case 'strong':
+        return `**${getRawTextFromChildren(child.children)}**`;
       case 'emphasis':
+        return `*${getRawTextFromChildren(child.children)}*`;
       case 'delete':
+        return `~~${getRawTextFromChildren(child.children)}~~`;
       case 'link':
-        return child.children ? getRawTextFromChildren(child.children) : '';
+        return `[${getRawTextFromChildren(child.children)}](${(child as any).url})`;
+      case 'inlineCode':
+        return `\`${(child as any).value}\``;
+      case 'html':
+        return (child as any).value || '';
       default:
         return '';
     }
   }).join('');
 };
 
+const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, listIndex }) => {
+  const { activeBlockId, setActiveBlockId, updateBlock } = useEditorCommands();
+  const isEditing = activeBlockId === block.id;
 
-const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, onUpdateBlockContent, listIndex }) => {
   const { id, content: { children }, metadata } = block;
   const { checked, ordered, depth } = metadata;
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingText, setEditingText] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [clickCoords, setClickCoords] = useState<{ x: number, y: number } | null>(null);
 
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      const rawText = getRawTextFromChildren(children);
-      setEditingText(rawText);
-      logger.debug(`[ListItemRenderer] Initializing edit for ${id} with pure text:`, rawText);
-      textareaRef.current.value = rawText;
-      textareaRef.current.focus();
-    }
-  }, [isEditing, children, id]);
-
-  const handleDoubleClick = () => {
-    if (onUpdateBlockContent) {
-      logger.debug(`[ListItemRenderer] Double click on item ${id}. Entering edit mode.`);
-      setIsEditing(true);
-    } else {
-      logger.warn(`[ListItemRenderer] Double click on item ${id} but onUpdateBlockContent is missing.`);
-    }
+  const handleClick = (e: React.MouseEvent) => {
+    setClickCoords({ x: e.clientX, y: e.clientY });
+    setActiveBlockId(id);
   };
 
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditingText(event.target.value);
-  };
+  const handleSave = useCallback((newMarkdown: string) => {
+    const newBlocks = markdownToBlocks(newMarkdown);
+    updateBlock(id, block, { type: 'REPLACE_WITH_BLOCKS', newBlocks });
+    setActiveBlockId(null);
+  }, [updateBlock, id, block, setActiveBlockId]);
 
-  const handleSave = () => {
-    if (!isEditing || !onUpdateBlockContent) return;
-    logger.debug(`[ListItemRenderer] Saving item ${id}. Pure text:`, editingText);
-    onUpdateBlockContent(id, editingText);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    const originalRawText = getRawTextFromChildren(children);
-    setEditingText(originalRawText);
-    setIsEditing(false);
-    logger.debug(`[ListItemRenderer] Cancelling edit for item ${id}.`);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSave();
-    } else if (event.key === 'Escape') {
-      event.preventDefault(); 
-      handleCancel();
-    }
-  };
+  const handleCancel = useCallback(() => {
+    setActiveBlockId(null);
+  }, [setActiveBlockId]);
 
   const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     event.stopPropagation();
     const newCheckedState = event.target.checked;
-    logger.debug(`[ListItemRenderer] Checkbox for item ${id} changed to: ${newCheckedState}`);
-
-    if (!onUpdateBlockContent) {
-      logger.warn(`[ListItemRenderer] Checkbox changed for ${id} but onUpdateBlockContent is missing.`);
-      return;
-    }
-
+    const rawMarkdown = children && children.length > 0
+      ? children.map(child => (child as any).rawMarkdown || (child as any).value || '').join('')
+      : '';
     const indentation = '  '.repeat(block.metadata.depth || 0); 
-    const marker = block.metadata.ordered ? '1. ' : '- ';
+    const markerStr = block.metadata.ordered ? '1. ' : '- ';
     const newCheckboxMarker = newCheckedState ? '[x] ' : '[ ] ';
-    const newPrefix = `${indentation}${marker}${newCheckboxMarker}`;
-
-    const rawTextContent = getRawTextFromChildren(children);
-
-    const newFullRawText = newPrefix + rawTextContent;
-    logger.debug(`[ListItemRenderer] Calling onUpdateBlockContent for ${id} with new text:`, newFullRawText);
-
-    onUpdateBlockContent(id, newFullRawText);
+    const newFullRawText = `${indentation}${markerStr}${newCheckboxMarker}${rawMarkdown}`;
+    
+    const newBlocks = markdownToBlocks(newFullRawText);
+    updateBlock(id, block, { type: 'REPLACE_WITH_BLOCKS', newBlocks });
   };
 
+  useEffect(() => {
+    if (metadata?.isNewBlock && !isEditing) {
+      setActiveBlockId(id);
+      const updatedMetadata = { ...metadata };
+      delete updatedMetadata.isNewBlock;
+      updateBlock(id, block, { type: 'UPDATE_METADATA', metadata: updatedMetadata });
+    }
+  }, [metadata?.isNewisEditing, setActiveBlockId, id, updateBlock, block]);
+
   if (isEditing) {
+    const fallbackRawText = children && children.length > 0 ? getRawTextFromChildren(children) : '';
+    const indentationStr = '  '.repeat(depth || 0);
+    const markerStr = ordered ? '1. ' : '- ';
+    const checkboxStr = checked === true ? '[x] ' : (checked === false ? '[ ] ' : '');
+    const computedInitialContent = block.rawMarkdown || `${indentationStr}${markerStr}${checkboxStr}${fallbackRawText}`;
+
     return (
-      <div key={id} className="editing-list-item">
-        <textarea
-          ref={textareaRef}
-          value={editingText}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave} 
-          className="block w-full font-sans text-base p-1 border border-blue-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-          rows={Math.max(1, editingText.split('\n').length)}
+      <div key={`${id}-editor`} className="editing-list-item" style={{ paddingLeft: `${(depth || 0) * 1.5}rem` }}>
+        <CoreBlockEditor
+          blockId={id}
+          initialContent={computedInitialContent}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          languageMode="markdown"
+          enableInlineFormatting={true}
+          autoFocus={true}
+          singleLine={true}
+          initialClickCoords={clickCoords}
         />
       </div>
     );
@@ -167,9 +149,9 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
       {!checkboxElement && <span className="mr-2 list-marker">{marker}</span>}
       {checkboxElement}
       <div 
-        className="list-item-main-content flex-1"
-        onDoubleClick={handleDoubleClick}
-        title="Double-cliquez pour modifier"
+        className="list-item-main-content flex-1 cursor-text"
+        onClick={handleClick}
+        title="Cliquez pour modifier"
       >
         {mainContent}
       </div>
@@ -180,8 +162,6 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
     <div 
       key={id}
       className="list-item-content"
-      // Applique un padding à gauche pour l'indentation visuelle des éléments de liste imbriqués.
-      // Chaque niveau de profondeur (depth) ajoute 1.5rem de padding.
       style={{ paddingLeft: `${(depth || 0) * 1.5}rem` }}
     >
       {contentWithMarker}
@@ -189,4 +169,4 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
   );
 };
 
-export default CustomListItemRenderer; 
+export default React.memo(CustomListItemRenderer);

@@ -23,7 +23,7 @@ interface CustomCodeBlockRendererProps {
 const CustomCodeBlockRenderer = React.forwardRef<
   HTMLPreElement, // Type de l'élément DOM racine (pre)
   CustomCodeBlockRendererProps
->(({ block, style, ...rest }, ref) => {
+>(({ block, style, listIndex, index, ...rest }, ref) => {
   const { language, code } = block.content;
   const { metadata } = block;
   const indentationLevel = metadata?.indentationLevel;
