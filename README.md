@@ -1,119 +1,95 @@
-# Boilerplate React/Vite/TS/Tailwind - Architecture Hexagonale
+# Nova : Éditeur Markdown Modulaire Assisté par IA
 
-Ce répertoire (`app_vite/`) contient un boilerplate solide pour démarrer une application web frontend moderne, en mettant l'accent sur une architecture propre (inspirée de l'Architecture Hexagonale / Clean Architecture).
+Nova est un éditeur Markdown modulaire, organisé en blocs — un paragraphe, un titre, une liste, un tableau, un diagramme sont autant d'unités indépendantes qu'on peut éditer, déplacer, transformer. Rien d'original jusque-là : c'est le principe qu'on retrouve dans Notion, dans Confluence, dans beaucoup d'éditeurs modernes. Je le développe seul, sur mon temps libre.
 
-## Objectif
+Ce qui m'intéressait en le construisant, c'était la couche suivante : brancher un assistant IA capable de lire ce document, comprendre sa structure, et le modifier de façon fiable — insérer une section, reformuler un paragraphe, générer un diagramme — sans jamais corrompre l'ensemble ni passer par une interface de chat externe déconnectée du canevas.
 
-Fournir une base de code organisée, testable et maintenable pour une application React utilisant Vite, TypeScript et Tailwind CSS.
+Ma première tentative a suivi la voie standard : le function calling natif des API de LLM (Gemini, dans mon cas, via Vertex AI). Le modèle répond avec un objet JSON structuré, l'application l'interprète, tout est propre sur le papier. Sauf que dans la pratique, dès qu'on demande à un modèle de produire du contenu long et multi-lignes — un paragraphe entier, du code, un tableau — encapsulé dans une valeur JSON, les guillemets et les sauts de ligne mal échappés finissent régulièrement par casser la structure ou, pire, effacer silencieusement des blocs entiers du document.
 
-## Stack Technique
+Ce n'est pas une anecdote isolée. C'est un problème documenté dans l'écosystème des outils d'édition assistée par IA — plusieurs agents de code réputés sont passés par le même constat et ont fini par préférer des formats texte à délimiteurs plutôt que du JSON strict, précisément pour cette raison.
 
-*   **Framework UI :** React 19
-*   **Build Tool :** Vite 6
-*   **Langage :** TypeScript 5
-*   **Styling :** Tailwind CSS 4 (intégré via `@tailwindcss/vite`)
-*   **Tests :** Vitest (configuré pour l'environnement `jsdom`)
-*   **Appels HTTP :** Axios
-*   **Logging :** Pino (via un adaptateur)
+## Le protocole de mutation
 
-## Structure des Dossiers (`src/`)
+J'ai donc abandonné le function calling natif au profit d'un protocole texte maison. Le modèle répond en Markdown libre, mais encadré par des balises légères qui indiquent l'intention :
 
-La structure est organisée par couches, conformément aux principes de la Clean Architecture / Hexagonale :
+- `nova:insert after="ID_BLOC"` — insérer du contenu après un bloc existant
+- `nova:update id="ID_BLOC"` — remplacer le contenu d'un bloc
+- `nova:delete id="ID_BLOC"` — supprimer un bloc
 
-*   `domain/`: Contient la logique métier principale, indépendante de tout framework ou détail technique.
-    *   Entités (ex: `Configuration.ts`, `Document.ts`)
-    *   Value Objects
-    *   Règles Métier Pures
-*   `application/`: Orchestre les cas d'utilisation (Use Cases) de l'application.
-    *   `ports/`: Définit les interfaces (contrats) nécessaires pour interagir avec le monde extérieur (Infrastructure) ou le domaine.
-        *   `driven/` (ou `output/` ou `repositories/`) : Interfaces pour les dépendances externes (ex: `IConfigurationRepository`).
-        *   `driver/` (ou `input/` ou `use_cases/`) : Interfaces pour les cas d'utilisation eux-mêmes (moins courant si les Use Cases sont des classes).
-        *   `logging/`: Interface `ILogger`.
-        *   `settings/`: Interface `IAppSettingsRepository`.
-    *   `use_cases/`: Implémentations des cas d'utilisation (ex: `GetConfigurationUseCase.ts`).
-*   `infrastructure/`: Contient les implémentations concrètes des ports définis dans l'application, interagissant avec des outils/services externes.
-    *   `adapters/`: Implémentations des ports (ex: `api/`, `storage/`, `settings/`).
-    *   `logging/`: Implémentation du logger (`PinoLogger.ts`).
-    *   `repositories/`: Contient la factory (`RepositoryFactory.ts`) qui fournit les bonnes implémentations des repositories en fonction de la configuration.
-*   `presentation/`: Couche UI (React).
-    *   `components/`: Composants React réutilisables (ex: `base/`, `layout/`).
-    *   `hooks/`: Hooks React personnalisés.
-    *   `pages/` ou `views/`: Composants représentant des pages complètes (si le routing est ajouté).
-*   `styles/`: Fichiers CSS globaux (ex: `tailwind.css`).
+Entre ces balises, le modèle écrit du Markdown pur — celui qu'il maîtrise le mieux, celui sur lequel il a été massivement entraîné. Pas de grammaire artificielle à respecter pour le contenu lui-même, seulement pour son enveloppe. Ce point mérite d'être précisé : la sortie du LLM n'est jamais interprétée comme du texte libre qu'on essaierait de comprendre après coup. C'est une **intention d'action typée** — insérer, mettre à jour, supprimer — ciblée sur l'identifiant précis d'un bloc du document. Le modèle ne génère pas un nouveau document, il décrit une mutation à appliquer à un document existant.
 
-**Fichiers à la racine de `src/`:**
+Un parseur côté application lit ce flux et déclenche les mutations correspondantes sur l'état réel du document, géré par un `useReducer` classique et distribué dans l'arbre React via le Context API — le même chemin de mutation que celui qui traite les actions de l'utilisateur au clavier ou à la souris. C'est un point auquel je tiens : le LLM ne dispose d'aucun chemin de mutation privilégié. Il propose des actions ; l'application les valide et les applique exactement comme si elles venaient d'un clic humain. La frontière entre le raisonnement probabiliste du modèle et l'exécution déterministe de l'application reste nette, à un seul endroit du code.
 
-*   `main.tsx`: Point d'entrée de l'application React.
-*   `App.tsx`: Composant React racine.
-*   `vite-env.d.ts`: Déclarations de types pour Vite.
-*   `setupTests.ts`: Fichier de configuration globale pour Vitest.
+Ce protocole texte n'est pas pour autant sans défaut. Il élimine les erreurs de formatage bloquantes qu'on rencontre avec du JSON strict, mais il déplace le risque ailleurs : une balise mal fermée par une génération interrompue, ou un contenu qui contiendrait accidentellement la séquence de fermeture d'une balise, restent des cas à gérer explicitement côté parseur plutôt que résolus par construction.
 
-## Démarrage Rapide
+## Le cœur du système : la boucle parseur, rendu, état, portée par le bloc
 
-1.  **Installer les dépendances :**
-    ```bash
-    npm install
-    ```
-2.  **Lancer le serveur de développement :**
-    ```bash
-    npm run dev
-    ```
-    L'application sera généralement accessible sur `http://localhost:5173` (ou un port voisin si celui-ci est occupé).
+S'il y a une décision d'architecture dont je suis particulièrement fier dans ce projet, c'est celle-ci, et elle est plus structurante que le protocole de mutation lui-même : chaque type de bloc, y compris les blocs "custom" ajoutés après coup, porte l'intégralité de son propre cycle de vie. Un module déclare en un seul endroit comment analyser son contenu Markdown brut, comment le restituer visuellement en React, comment le sérialiser en HTML pour l'export, et comment expliquer sa propre grammaire à l'IA.
 
-3.  **Lancer les tests :**
-    ```bash
-    npm run test
-    ```
+Ajouter un nouveau type de bloc à Nova ne demande jamais de modifier le cœur de l'application, ni de patcher le prompt système à la main. Le catalogue de capacités de l'IA grandit automatiquement avec le catalogue de modules, puisque chaque module contribue lui-même ses instructions, agrégées dynamiquement à l'exécution. C'est une application directe du principe ouvert/fermé : le système est ouvert à l'extension, fermé à la modification.
 
-## Configuration
+Concrètement, ces blocs custom s'appuient sur un mécanisme Markdown déjà standard, le bloc de code à langage nommé. Un module "palette de couleurs" se présente ainsi :
 
-*   **Vite (`vite.config.ts`) :** Configuration principale de Vite, incluant les plugins React et Tailwind, ainsi que la configuration de Vitest.
-*   **Tailwind (`tailwind.config.js`) :** Configuration de Tailwind CSS (personnalisation du thème, plugins, etc.). Les styles sont importés via `src/styles/tailwind.css`.
-*   **TypeScript (`tsconfig.json`) :** Configuration du compilateur TypeScript.
-*   **Variables d'Environnement (`.env`, `.env.development`, etc.) :** Utilisées pour configurer des aspects comme le niveau de log.
-    *   `VITE_LOG_LEVEL`: Contrôle le niveau de verbosité du logger (`trace`, `debug`, `info`, `warn`, `error`, `silent`). La valeur dans `.env.development` est utilisée pour `npm run dev`. La valeur dans `.env` est utilisée par défaut pour la production (`npm run build`).
-
-## Architecture & Concepts Clés
-
-*   **Ports & Adapters (Hexagonal) :** L'application définit des *ports* (interfaces dans `src/application/ports/`) qui représentent ses besoins (ex: `ILogger`, `IConfigurationRepository`). L'infrastructure fournit des *adaptateurs* (`src/infrastructure/adapters/` et `src/infrastructure/logging/`) qui implémentent ces interfaces en utilisant des outils concrets (ex: `PinoLogger`, `LocalStorageConfigurationRepository`, `ConfigurationApiAdapter`).
-*   **Injection de Dépendances (Simplifiée) :** La `RepositoryFactory` (`src/infrastructure/repositories/RepositoryFactory.ts`) agit comme un localisateur de services simple pour fournir les bonnes instances de repositories et de logger en fonction du mode de l'application (actuellement déterminé via `LocalStorageAppSettingsRepository`). Dans une application plus complexe, un véritable conteneur d'injection de dépendances pourrait être utilisé.
-*   **Découplage :** Grâce aux interfaces, le code de l'application et du domaine ne dépend pas directement des bibliothèques externes ou des détails d'implémentation de l'infrastructure.
-
-## Contribuer & Étendre
-
-### Ajouter une Dépendance
-
-```bash
-# Pour une dépendance de runtime
-npm install <nom-du-package>
-
-# Pour une dépendance de développement (ex: outil de test, linter)
-npm install -D <nom-du-package>
-
-# Si la dépendance est en TypeScript ou si des types sont disponibles séparément
-npm install -D @types/<nom-du-package>
+```palette
+--lemon-chiffon: #fbf8ccff;
+--jordy-blue: #a3c4f3ff;
 ```
 
-*Note :* Ce boilerplate utilise des outils modernes (Vite, pino) qui gèrent bien les modules ES (ESM). Si vous ajoutez une dépendance plus ancienne utilisant principalement CommonJS, vous *pourriez* (rarement) avoir besoin d'ajuster la configuration de Vite ou Vitest (`vite.config.ts`), mais essayez d'abord sans configuration supplémentaire.
+Le modèle n'a besoin d'apprendre qu'une seule chose nouvelle : la syntaxe interne du langage palette. La structure d'enveloppe, un bloc de code délimité par trois accents graves, il la connaît déjà parfaitement. C'est un choix qui paie doublement : la fiabilité de génération augmente, et la dégradation reste gracieuse. Si ce document est un jour ouvert dans un autre éditeur Markdown qui ne connaît pas ce module, le bloc palette ne casse rien, il s'affiche simplement comme un bloc de code brut, lisible, jamais comme une erreur.
 
-### Changer une Implémentation (ex: Remplacer le Logger)
+Deux exemples récents illustrent cette logique. Un bloc "variantes" permet à l'IA de proposer plusieurs versions d'un même passage, plusieurs tons, plusieurs longueurs, sans jamais écraser l'original ; l'utilisateur compare puis adopte la version qui lui convient. Un bloc "flux API" permet de représenter, en conception, une séquence d'appels d'endpoints avec les liaisons d'attributs entre eux : quel champ retourné par un appel devient le paramètre d'un appel suivant. Dans les deux cas, le rendu visuel est entièrement calculé côté application à partir d'une grammaire texte simple, sans dépendre d'un outil de diagramme externe, et sans qu'aucune ligne du cœur de l'éditeur n'ait eu à être modifiée pour les accueillir.
 
-C'est là que l'architecture Ports & Adapters montre sa force :
+## Le vrai défi : le contexte, pas le rendu
 
-1.  **Identifier le Port :** Trouvez l'interface définissant le contrat dont vous voulez changer l'implémentation (ex: `src/application/ports/logging/ILogger.ts`).
-2.  **Créer le Nouvel Adaptateur :** Créez une nouvelle classe dans `src/infrastructure/` (ex: `src/infrastructure/logging/WinstonLogger.ts`) qui **implémente** l'interface `ILogger` en utilisant la nouvelle bibliothèque (ex: `winston`).
-3.  **Mettre à Jour la Factory/DI :** Modifiez l'endroit où l'instance est créée. Dans notre cas, allez dans `src/infrastructure/repositories/RepositoryFactory.ts` et dans la fonction `getLogger`, remplacez `new PinoLogger()` par `new WinstonLogger()`.
-4.  **Adapter les Tests de l'Adaptateur :** Mettez à jour le test unitaire *spécifique* à l'ancien adaptateur (ex: `PinoLogger.test.ts` deviendrait `WinstonLogger.test.ts`) pour mocker la nouvelle bibliothèque (`winston`) et vérifier que votre nouvel adaptateur l'utilise correctement.
+Une fois qu'on a résolu la génération et le rendu, le problème le plus difficile de tout le projet apparaît ailleurs : comment faire comprendre à chaque nouvel appel du modèle l'état exact du document, sans reconstituer et renvoyer l'intégralité de son contenu à chaque échange ?
 
-**Important :** Aucune modification ne devrait être nécessaire dans les *autres* parties de l'application (Use Cases, Repositories qui *utilisent* `ILogger`) car elles dépendent uniquement de l'interface, pas de l'implémentation concrète.
+La réponse évidente, un historique de conversation classique qui accumule les échanges, pose un problème de fond : le contenu d'un bloc peut avoir été modifié entre deux tours, à la main, sans que le LLM en soit informé. S'appuyer sur une mémoire conversationnelle du contenu, c'est risquer de raisonner sur un état obsolète.
 
-## Prochaines Étapes / TODO
+La solution que j'ai retenue repose sur un compteur de révision, incrémenté à chaque mutation du document, qu'elle vienne de l'IA ou d'une édition manuelle. L'application garde en mémoire la dernière révision effectivement envoyée au modèle. À l'appel suivant, elle calcule elle-même, en code, la différence entre cet état et l'état courant, et n'envoie que ce différentiel, avec un mécanisme de bascule : au-delà d'un certain volume de changements cumulés, on repart d'un instantané complet plutôt que d'accumuler indéfiniment des diffs. L'historique de conversation, lui, reste volontairement léger : il conserve l'intention exprimée par l'utilisateur, jamais le contenu du document lui-même. C'est cette séparation stricte entre intention et contenu qui donne à l'ensemble sa traçabilité : à tout instant, on sait ce qui a changé, quand, et à quelle initiative, humaine ou IA.
 
-Ce boilerplate est une base. Les prochaines étapes typiques incluent :
+## Ce que j'en retiens
 
-*   [ ] Implémenter le **Routing** (ex: avec `react-router-dom`) pour gérer plusieurs pages/vues.
-*   [ ] Mettre en place une solution de **Gestion d'État Globale** (ex: Zustand, React Context, Redux Toolkit) pour partager des états comme le thème, l'état utilisateur, etc.
-*   [ ] Finaliser et tester l'adaptateur API (`ConfigurationApiAdapter`).
-*   [ ] Activer et écrire les tests pour les **Cas d'Utilisation** (`src/application/use_cases/`).
-*   [ ] Enrichir les composants UI de base (`src/presentation/components/`).
-*   [ ] Mettre en place une stratégie de **Gestion d'Erreurs** plus robuste (ex: Error Boundaries). 
+L'exercice de conception m'a appris quelque chose que je n'attendais pas au départ : les meilleures décisions n'ont presque jamais consisté à inventer un format nouveau. Elles ont consisté à identifier, à chaque étape, ce que le modèle savait déjà faire nativement, du Markdown, un bloc de code, un diagramme Mermaid, un tableau GFM, et à construire l'architecture tout autour, en réservant la nouveauté au strict minimum nécessaire, tout en gardant l'humain seul décisionnaire de ce qui est effectivement appliqué au document.
+
+C'est probablement la seule vraie règle de conception que je retiendrais d'un projet comme celui-ci : **plus l'IA doit apprendre une convention artificielle pour interagir avec votre système, plus vous introduisez de risque d'erreur. La fiabilité ne vient pas d'un protocole plus strict, mais d'un protocole qui exige le moins possible du modèle, et d'une architecture où chaque brique sait, par elle-même, se présenter à l'IA sans qu'on ait à le lui apprendre de l'extérieur.**
+
+---
+
+## 🚀 Démarrage Rapide
+
+### Stack Technique
+* **Frontend** : React 19, TypeScript, TailwindCSS 4, Vite
+* **State** : Zustand (UI) + Context API / useReducer (Document)
+* **Édition** : CodeMirror, dnd-kit (Drag&Drop)
+* **LLM** : Vertex AI / Gemini API
+* **Backend as a Service** : Firebase (Auth, Hosting)
+
+### Prérequis
+* Node.js (v18+)
+
+### Installation
+```bash
+npm install
+```
+
+### Configuration
+Créez un fichier `.env.development` à la racine :
+```env
+VITE_LOG_LEVEL=warn
+VITE_FIREBASE_API_KEY=votre_cle_api
+VITE_FIREBASE_AUTH_DOMAIN=votre_domaine
+VITE_FIREBASE_PROJECT_ID=votre_projet
+VITE_FIREBASE_STORAGE_BUCKET=votre_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=votre_id
+VITE_FIREBASE_APP_ID=votre_app_id
+```
+
+### Lancement
+```bash
+npm run dev
+```
+
+### Tests
+```bash
+npm run test
+``` 
