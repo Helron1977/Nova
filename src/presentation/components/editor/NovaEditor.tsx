@@ -83,6 +83,7 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
       const newBlock = createBlockFromAction(actionKey, 0);
       if (newBlock) {
         onAddBlockAfter({ afterId: lastBlockId, newBlock });
+        setTimeout(() => window.dispatchEvent(new CustomEvent('nova-set-active-block', { detail: newBlock.id })), 50);
       }
     };
 
@@ -130,6 +131,7 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
       increaseIndentation={onIncreaseIndentation}
       decreaseIndentation={onDecreaseIndentation}
       addSummaryBlock={handleAddSummaryBlock}
+      isSelectionModeActive={isSelectionModeActive}
     >
       <CommandPalette 
         isOpen={isCommandPaletteOpen}

@@ -12,7 +12,9 @@ interface HeaderProps {
   onExport: () => void;
   onExportAST?: () => void; // NOUVEAU: handler pour exporter l'AST
   hasUnsavedChanges: boolean;
-  // Les props liées à la sélection ont été retirées
+  documentName: string;
+  onNewDocument: () => void;
+  onChangeDocumentName: (newName: string) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -20,6 +22,9 @@ const Header: React.FC<HeaderProps> = ({
   onExport,
   onExportAST,
   hasUnsavedChanges,
+  documentName,
+  onNewDocument,
+  onChangeDocumentName,
 }) => {
   const { theme, toggleTheme, appMode, setAppMode } = useUiStore();
   const { user, isLoading, error, signInWithGoogle, logout } = useAuthStore();
@@ -96,10 +101,24 @@ const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-900 via-red-700 to-yellow-500 text-white p-3 shadow-md flex justify-between items-center print:hidden">
       <div className="flex items-center font-bold text-lg tracking-wide">
         <img src={logoImage} alt="Logo Nova" height="48" className="h-12 mr-2" />
-        <span className="text-xl font-semibold text-white dark:text-gray-200">Nova</span>
+        <span className="text-xl font-semibold text-white dark:text-gray-200 mr-4 hidden sm:inline">Nova</span>
+        <input
+          type="text"
+          value={documentName}
+          onChange={(e) => onChangeDocumentName(e.target.value)}
+          className="bg-white/20 hover:bg-white/30 focus:bg-white text-white focus:text-gray-900 placeholder-white/70 rounded px-2 py-1 outline-none transition-colors duration-200 w-32 sm:w-48 text-sm font-medium"
+          placeholder="Nom du document"
+        />
       </div>
 
       <div className="flex items-center">
+        <button
+          onClick={onNewDocument}
+          className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-full transition-colors duration-200 mr-3 hidden sm:flex items-center"
+          title="Nouveau document vierge"
+        >
+          Nouveau
+        </button>
         <button
           onClick={handleLoadClick}
           className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-3 rounded-full transition-colors duration-200 mr-3"

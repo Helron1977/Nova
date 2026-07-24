@@ -73,7 +73,13 @@ export const useBlocksManagement = (initialBlocks: Block[]) => {
 
   const handleAddBlockAtEnd = useCallback((newBlock: Block) => {
     dispatch({ type: 'ADD_BLOCK_AT_END', payload: { newBlock } });
-  }, []);
+    setTimeout(() => {
+      const el = document.querySelector(`[data-block-id="${newBlock.id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }, [dispatch]);
 
   const deleteBlocksByType = useCallback((type: string) => {
     dispatch({ type: 'DELETE_BLOCKS_BY_TYPE', payload: type });

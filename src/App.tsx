@@ -126,6 +126,7 @@ function App() {
   const appMode = useUiStore((state) => state.appMode); // NOUVEAU
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [documentName, setDocumentName] = useState<string>('Document sans titre');
   const blocksContainerRef = useRef<HTMLDivElement>(null);
 
   const blocksManagement = useBlocksManagement([]);
@@ -384,7 +385,7 @@ function App() {
           border-bottom: 1px solid #ccc;
           margin: 1.5em 0;
         }
-        img { max-width: 100%; height: auto; display: block; margin-bottom: 1em; }
+        img, svg { max-width: 100%; height: auto; display: block; margin-bottom: 1em; }
         .print-hidden { display: none !important; }
         
         /* Blocs de code et inline code */
@@ -441,7 +442,7 @@ function App() {
     const doc = iframe.contentWindow?.document || iframe.contentDocument;
     if (doc) {
       doc.open();
-      doc.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Export PDF</title><style>${printStyles}</style></head><body>${htmlContent}</body></html>`);
+      doc.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${documentName}</title><style>${printStyles}</style></head><body>${htmlContent}</body></html>`);
       doc.close();
 
       iframe.onload = () => {
@@ -529,9 +530,20 @@ function App() {
     return outputMarkdown;
   };
 
+
+
   const handleFullExportProcess = useCallback(() => {
     setIsExportModalOpen(true);
   }, []);
+
+  const handleNewDocument = useCallback(() => {
+    const name = window.prompt("Nom du nouveau document:", "Nouveau Document");
+    if (name !== null) {
+      setDocumentName(name);
+      setExternalBlocks([]);
+      setHasUnsavedChanges(false);
+    }
+  }, [setExternalBlocks]);
 
   const executeExport = useCallback(async (formatChoice: string) => {
     logger.debug(`[App] EXPORT: executeExport CALLED for format: ${formatChoice}`);
@@ -673,8 +685,9 @@ function App() {
       switch (formatChoice) {
         case 'md':
           logger.debug('[App] EXPORT: Format MD chosen.');
-          const mdFileName = prompt("Exporter en Markdown sous le nom :", `nova-document-${new Date().toISOString().split('T')[0]}.md`);
-          if (mdFileName) {
+          if (markdownPure) {
+            const defaultFilename = documentName.trim() ? `${documentName.trim().replace(/[^a-z0-9_-]/gi, '-')}.md` : `nova-document-${new Date().toISOString().split('T')[0]}.md`;
+            const mdFileName = window.prompt("Nom du fichier Markdown:", defaultFilename) || defaultFilename;
             downloadFile(mdFileName, markdownPure, 'text/markdown;charset=utf-8');
             logger.debug(`[App] EXPORT: Document exporte en Markdown sous : ${mdFileName}`);
             setHasUnsavedChanges(false);
@@ -713,7 +726,8 @@ function App() {
 ${finalHtmlContent}
 </body>
 </html>`;
-            downloadHtmlFile(fullHtml, `nova-document-${new Date().toISOString().split('T')[0]}.html`);
+            const htmlFilename = documentName.trim() ? `${documentName.trim().replace(/[^a-z0-9_-]/gi, '-')}.html` : `nova-document-${new Date().toISOString().split('T')[0]}.html`;
+            downloadHtmlFile(fullHtml, htmlFilename);
           } else {
             logger.error('[App] EXPORT: HTML content is null for HTML export. This should not happen.');
           }
@@ -819,6 +833,9 @@ ${finalHtmlContent}
         onExport={handleFullExportProcess}
         onExportAST={handleExportAST}
         hasUnsavedChanges={hasUnsavedChanges}
+        documentName={documentName}
+        onNewDocument={handleNewDocument}
+        onChangeDocumentName={setDocumentName}
       />
       <MainContent>
         {appMode === 'admin' ? (

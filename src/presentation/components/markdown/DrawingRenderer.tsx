@@ -34,7 +34,9 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
     customData,
     theme,
   } = props;
-  const { updateBlock } = useEditorCommands();
+  const { activeBlockId, updateBlock, isSelectionModeActive } = useEditorCommands();
+  const propIsEditing = activeBlockId === block.id;
+  const interactionDisabled = !propIsEditing || isSelectionModeActive;
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [isCurrentlyDrawing, setIsCurrentlyDrawing] = useState(false);
@@ -399,6 +401,7 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
 
       <svg
         ref={svgRef}
+        viewBox={`0 0 ${drawingWidth} ${drawingHeight}`}
         width={drawingWidth}
         height={drawingHeight}
         className={`border dark:border-gray-700 rounded-b-md ${interactionDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-crosshair'}`}

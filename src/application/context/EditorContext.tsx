@@ -13,6 +13,7 @@ export interface EditorCommands {
   increaseIndentation: (blockId: string) => void;
   decreaseIndentation: (blockId: string) => void;
   addSummaryBlock?: () => void;
+  isSelectionModeActive?: boolean;
 }
 
 const EditorContext = createContext<EditorCommands | undefined>(undefined);
@@ -35,10 +36,21 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
 }) => {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
-  // Pour débugger, on peut ajouter un effet qui log le bloc actif
-  // React.useEffect(() => {
-  //   console.log('Active Block ID:', activeBlockId);
-  // }, [activeBlockId]);
+  React.useEffect(() => {
+    const handleClear = () => setActiveBlockId(null);
+    const handleSet = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setActiveBlockId(customEvent.detail);
+      }
+    };
+    window.addEventListener('nova-clear-active-block', handleClear);
+    window.addEventListener('nova-set-active-block', handleSet);
+    return () => {
+      window.removeEventListener('nova-clear-active-block', handleClear);
+      window.removeEventListener('nova-set-active-block', handleSet);
+    };
+  }, []);
 
   return (
     <EditorContext.Provider value={{ ...commands, activeBlockId, setActiveBlockId }}>

@@ -61,7 +61,12 @@ const CoreBlockEditor: React.FC<CoreBlockEditorProps> = (props) => {
     // Ignorer si le focus reste à l'intérieur du composant (ex: clics internes)
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     logger.debug(`[CoreBlockEditor - ${blockId}] Blur detected, saving...`);
-    handleValidate();
+    // On décale la sauvegarde pour laisser le temps au navigateur de finaliser 
+    // le transfert de focus (ex: clic sur la PersistentInputZone).
+    // Sinon, le démontage immédiat de l'éditeur perturbe le focus.
+    setTimeout(() => {
+      handleValidate();
+    }, 50);
   }, [handleValidate, blockId]);
 
   return (

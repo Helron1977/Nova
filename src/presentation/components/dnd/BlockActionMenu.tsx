@@ -196,6 +196,7 @@ export const BlockActionMenu: React.FC<BlockActionMenuProps> = ({
     if (newBlockToCreate) {
       // Si createBlockFromAction a renvoyé un block avec un nouvel ID, on s'en sert, sinon on utilise le block original.
       addBlockAfter({ afterId: sortableId, newBlock: newBlockToCreate });
+      setTimeout(() => window.dispatchEvent(new CustomEvent('nova-set-active-block', { detail: newBlockToCreate!.id })), 50);
     }
     setIsPrimarySelectorOpen(false);
     setIsMarkerSelectorOpen(false);
