@@ -1,95 +1,108 @@
-# Nova : Éditeur Markdown Modulaire Assisté par IA
+# Nova
 
-Nova est un éditeur Markdown modulaire, organisé en blocs — un paragraphe, un titre, une liste, un tableau, un diagramme sont autant d'unités indépendantes qu'on peut éditer, déplacer, transformer. Rien d'original jusque-là : c'est le principe qu'on retrouve dans Notion, dans Confluence, dans beaucoup d'éditeurs modernes. Je le développe seul, sur mon temps libre.
+Un éditeur Markdown modulaire par blocs, avec l'IA intégrée directement dans le flux d'édition — pas comme un chat à côté, mais comme un agent qui insère, modifie et supprime des blocs au même titre qu'un geste humain.
 
-Ce qui m'intéressait en le construisant, c'était la couche suivante : brancher un assistant IA capable de lire ce document, comprendre sa structure, et le modifier de façon fiable — insérer une section, reformuler un paragraphe, générer un diagramme — sans jamais corrompre l'ensemble ni passer par une interface de chat externe déconnectée du canevas.
+Projet personnel, développé seul. Pas de compte, pas de serveur : tout tourne dans le navigateur, avec votre propre clé API (OpenAI, Anthropic, Gemini, ou un point de terminaison compatible).
 
-Ma première tentative a suivi la voie standard : le function calling natif des API de LLM (Gemini, dans mon cas, via Vertex AI). Le modèle répond avec un objet JSON structuré, l'application l'interprète, tout est propre sur le papier. Sauf que dans la pratique, dès qu'on demande à un modèle de produire du contenu long et multi-lignes — un paragraphe entier, du code, un tableau — encapsulé dans une valeur JSON, les guillemets et les sauts de ligne mal échappés finissent régulièrement par casser la structure ou, pire, effacer silencieusement des blocs entiers du document.
+## Pourquoi
 
-Ce n'est pas une anecdote isolée. C'est un problème documenté dans l'écosystème des outils d'édition assistée par IA — plusieurs agents de code réputés sont passés par le même constat et ont fini par préférer des formats texte à délimiteurs plutôt que du JSON strict, précisément pour cette raison.
+La plupart des intégrations IA dans les éditeurs de texte fonctionnent comme un chat greffé à côté du document : on discute, on copie-colle le résultat. Nova part d'un principe différent — l'IA doit pouvoir agir directement sur la structure du document, bloc par bloc, avec la même fiabilité qu'un utilisateur qui clique et tape.
 
-## Le protocole de mutation
+Trois idées portent le projet :
 
-J'ai donc abandonné le function calling natif au profit d'un protocole texte maison. Le modèle répond en Markdown libre, mais encadré par des balises légères qui indiquent l'intention :
+- **Le document reste du Markdown pur.** Pas de format propriétaire. Un fichier `.md` sauvegardé par Nova reste lisible et éditable dans n'importe quel autre outil — y compris ses blocs personnalisés, qui se dégradent gracieusement en simples blocs de code s'ils ne sont pas reconnus ailleurs.
+- **Chaque type de bloc est un module autonome.** Un module déclare lui-même comment analyser son contenu, comment le restituer, comment l'exporter en HTML, et comment se présenter à l'IA. Ajouter un nouveau type de bloc ne touche jamais au cœur de l'application.
+- **L'IA propose, l'application décide.** Le modèle ne dispose d'aucun chemin de mutation privilégié. Il répond avec des instructions ciblées (insérer, modifier, supprimer un bloc précis), qui passent par le même mécanisme d'état que n'importe quelle action humaine.
 
-- `nova:insert after="ID_BLOC"` — insérer du contenu après un bloc existant
-- `nova:update id="ID_BLOC"` — remplacer le contenu d'un bloc
-- `nova:delete id="ID_BLOC"` — supprimer un bloc
+## Fonctionnalités
 
-Entre ces balises, le modèle écrit du Markdown pur — celui qu'il maîtrise le mieux, celui sur lequel il a été massivement entraîné. Pas de grammaire artificielle à respecter pour le contenu lui-même, seulement pour son enveloppe. Ce point mérite d'être précisé : la sortie du LLM n'est jamais interprétée comme du texte libre qu'on essaierait de comprendre après coup. C'est une **intention d'action typée** — insérer, mettre à jour, supprimer — ciblée sur l'identifiant précis d'un bloc du document. Le modèle ne génère pas un nouveau document, il décrit une mutation à appliquer à un document existant.
+- Édition par blocs avec glisser-déposer, raccourcis clavier, menu contextuel
+- Rendu Markdown complet : titres, listes, tableaux GFM, citations, code, tâches
+- Diagrammes Mermaid édités visuellement (clic droit sur un nœud, pas seulement le code source)
+- Blocs personnalisés extensibles : palette de couleurs, tableur CSV, dessin, carte géographique, comparaison de variantes IA, flux d'appels API
+- Export HTML et PDF fidèle à l'affichage
+- Assistant IA multi-fournisseur (OpenAI, Anthropic, Gemini, ou tout point de terminaison compatible) avec retour visuel en direct sur les blocs modifiés
 
-Un parseur côté application lit ce flux et déclenche les mutations correspondantes sur l'état réel du document, géré par un `useReducer` classique et distribué dans l'arbre React via le Context API — le même chemin de mutation que celui qui traite les actions de l'utilisateur au clavier ou à la souris. C'est un point auquel je tiens : le LLM ne dispose d'aucun chemin de mutation privilégié. Il propose des actions ; l'application les valide et les applique exactement comme si elles venaient d'un clic humain. La frontière entre le raisonnement probabiliste du modèle et l'exécution déterministe de l'application reste nette, à un seul endroit du code.
+## Architecture
 
-Ce protocole texte n'est pas pour autant sans défaut. Il élimine les erreurs de formatage bloquantes qu'on rencontre avec du JSON strict, mais il déplace le risque ailleurs : une balise mal fermée par une génération interrompue, ou un contenu qui contiendrait accidentellement la séquence de fermeture d'une balise, restent des cas à gérer explicitement côté parseur plutôt que résolus par construction.
+Le code suit une séparation en quatre couches :
 
-## Le cœur du système : la boucle parseur, rendu, état, portée par le bloc
+```
+src/
+├── domain/          # Entités métier (Document, Configuration...), indépendantes du framework
+├── application/      # Logique : reducer de blocs, parseur Markdown, protocole IA, modules de blocs
+├── infrastructure/    # Logging, adaptateurs externes
+└── presentation/      # Composants React, rendu, interactions
+```
 
-S'il y a une décision d'architecture dont je suis particulièrement fier dans ce projet, c'est celle-ci, et elle est plus structurante que le protocole de mutation lui-même : chaque type de bloc, y compris les blocs "custom" ajoutés après coup, porte l'intégralité de son propre cycle de vie. Un module déclare en un seul endroit comment analyser son contenu Markdown brut, comment le restituer visuellement en React, comment le sérialiser en HTML pour l'export, et comment expliquer sa propre grammaire à l'IA.
+### Le protocole de mutation
 
-Ajouter un nouveau type de bloc à Nova ne demande jamais de modifier le cœur de l'application, ni de patcher le prompt système à la main. Le catalogue de capacités de l'IA grandit automatiquement avec le catalogue de modules, puisque chaque module contribue lui-même ses instructions, agrégées dynamiquement à l'exécution. C'est une application directe du principe ouvert/fermé : le système est ouvert à l'extension, fermé à la modification.
+L'assistant ne renvoie jamais de JSON structuré. Il répond en Markdown libre, encadré par des balises minimales :
 
-Concrètement, ces blocs custom s'appuient sur un mécanisme Markdown déjà standard, le bloc de code à langage nommé. Un module "palette de couleurs" se présente ainsi :
+```
+<nova:insert after="ID_BLOC">
+## Nouvelle section
+</nova:insert>
 
+<nova:update id="ID_BLOC">
+Contenu remplacé.
+</nova:update>
+
+<nova:delete id="ID_BLOC" />
+```
+
+Le contenu entre les balises est du Markdown que le modèle maîtrise nativement — pas de grammaire artificielle à apprendre pour le texte lui-même. Un parseur dédié (`novaProtocolParser.ts`) transforme ce flux en actions sur le reducer de blocs (`useBlocksReducer.ts`), le même reducer qui traite les actions au clavier et à la souris.
+
+Ce choix vient d'un abandon assumé du function calling natif des API de LLM : demander à un modèle de produire du contenu long et multi-lignes encapsulé dans une valeur JSON entraîne régulièrement des erreurs d'échappement qui corrompent ou effacent silencieusement des blocs. Le protocole texte n'est pas sans défaut pour autant — il déplace le risque vers la robustesse du parseur plutôt que de l'éliminer — mais il élimine la classe d'erreurs la plus destructrice.
+
+### Les modules de blocs
+
+Chaque bloc personnalisé implémente une interface commune :
+
+```ts
+interface BlockModule<T> {
+  type: string;
+  codeBlockLanguage: string;       // ex: "palette", "apiflow"
+  parseContent(raw: string): T;
+  RendererComponent: React.FC;
+  serializeToHTML(data: T): string;
+  getAIPrompt(): string;           // sa propre grammaire, expliquée à l'IA
+  getAIASTNode(block): object;     // sa propre représentation dans le contexte envoyé au modèle
+}
+```
+
+Un module s'appuie sur un mécanisme Markdown déjà standard — le bloc de code à langage nommé — pour son enveloppe, et ne définit que sa grammaire interne :
+
+````
 ```palette
 --lemon-chiffon: #fbf8ccff;
 --jordy-blue: #a3c4f3ff;
 ```
+````
 
-Le modèle n'a besoin d'apprendre qu'une seule chose nouvelle : la syntaxe interne du langage palette. La structure d'enveloppe, un bloc de code délimité par trois accents graves, il la connaît déjà parfaitement. C'est un choix qui paie doublement : la fiabilité de génération augmente, et la dégradation reste gracieuse. Si ce document est un jour ouvert dans un autre éditeur Markdown qui ne connaît pas ce module, le bloc palette ne casse rien, il s'affiche simplement comme un bloc de code brut, lisible, jamais comme une erreur.
+Ajouter un module se résume à l'enregistrer une fois (`registerBlockModule(...)`) : le catalogue de capacités de l'IA grandit automatiquement, sans jamais toucher au prompt système à la main.
 
-Deux exemples récents illustrent cette logique. Un bloc "variantes" permet à l'IA de proposer plusieurs versions d'un même passage, plusieurs tons, plusieurs longueurs, sans jamais écraser l'original ; l'utilisateur compare puis adopte la version qui lui convient. Un bloc "flux API" permet de représenter, en conception, une séquence d'appels d'endpoints avec les liaisons d'attributs entre eux : quel champ retourné par un appel devient le paramètre d'un appel suivant. Dans les deux cas, le rendu visuel est entièrement calculé côté application à partir d'une grammaire texte simple, sans dépendre d'un outil de diagramme externe, et sans qu'aucune ligne du cœur de l'éditeur n'ait eu à être modifiée pour les accueillir.
+### Le contexte envoyé au modèle
 
-## Le vrai défi : le contexte, pas le rendu
+Le document est représenté sous forme d'AST XML dense avant chaque appel (`astGenerator.ts`). Les blocs volumineux (code long, Mermaid) sont élidés au-delà d'un seuil pour limiter le coût en tokens. Un mécanisme de diff (`astDiff.ts`) permet, sur les tours suivants, de n'envoyer que ce qui a changé depuis la dernière synchronisation plutôt que l'intégralité du document — avec un mécanisme de bascule qui repart d'un instantané complet au-delà d'un certain volume de changements cumulés.
 
-Une fois qu'on a résolu la génération et le rendu, le problème le plus difficile de tout le projet apparaît ailleurs : comment faire comprendre à chaque nouvel appel du modèle l'état exact du document, sans reconstituer et renvoyer l'intégralité de son contenu à chaque échange ?
+## Stack technique
 
-La réponse évidente, un historique de conversation classique qui accumule les échanges, pose un problème de fond : le contenu d'un bloc peut avoir été modifié entre deux tours, à la main, sans que le LLM en soit informé. S'appuyer sur une mémoire conversationnelle du contenu, c'est risquer de raisonner sur un état obsolète.
+- React + TypeScript, Vite
+- `@dnd-kit` pour le glisser-déposer
+- CodeMirror pour l'édition experte des blocs (code, Mermaid)
+- Mermaid.js pour les diagrammes
+- Vercel AI SDK (`@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`) pour l'appel multi-fournisseur
+- Zustand pour l'état d'interface (thème, préférences) — l'état du document lui-même passe par un reducer + Context API, pas par un store global
 
-La solution que j'ai retenue repose sur un compteur de révision, incrémenté à chaque mutation du document, qu'elle vienne de l'IA ou d'une édition manuelle. L'application garde en mémoire la dernière révision effectivement envoyée au modèle. À l'appel suivant, elle calcule elle-même, en code, la différence entre cet état et l'état courant, et n'envoie que ce différentiel, avec un mécanisme de bascule : au-delà d'un certain volume de changements cumulés, on repart d'un instantané complet plutôt que d'accumuler indéfiniment des diffs. L'historique de conversation, lui, reste volontairement léger : il conserve l'intention exprimée par l'utilisateur, jamais le contenu du document lui-même. C'est cette séparation stricte entre intention et contenu qui donne à l'ensemble sa traçabilité : à tout instant, on sait ce qui a changé, quand, et à quelle initiative, humaine ou IA.
+## Limites connues
 
-## Ce que j'en retiens
+Ce projet est un prototype personnel, pas un produit prêt pour un usage multi-utilisateur :
 
-L'exercice de conception m'a appris quelque chose que je n'attendais pas au départ : les meilleures décisions n'ont presque jamais consisté à inventer un format nouveau. Elles ont consisté à identifier, à chaque étape, ce que le modèle savait déjà faire nativement, du Markdown, un bloc de code, un diagramme Mermaid, un tableau GFM, et à construire l'architecture tout autour, en réservant la nouveauté au strict minimum nécessaire, tout en gardant l'humain seul décisionnaire de ce qui est effectivement appliqué au document.
+- La clé API est actuellement stockée côté client (`localStorage`) — adapté à un usage local, pas à un déploiement partagé sans passer par un proxy serveur.
+- Pas encore de notion de classeur ou de liens entre plusieurs documents — chaque session porte sur un document unique.
+- La couverture de tests reste partielle sur le pipeline IA (protocole de mutation, génération de contexte), plus complète sur le cœur de sérialisation Markdown.
 
-C'est probablement la seule vraie règle de conception que je retiendrais d'un projet comme celui-ci : **plus l'IA doit apprendre une convention artificielle pour interagir avec votre système, plus vous introduisez de risque d'erreur. La fiabilité ne vient pas d'un protocole plus strict, mais d'un protocole qui exige le moins possible du modèle, et d'une architecture où chaque brique sait, par elle-même, se présenter à l'IA sans qu'on ait à le lui apprendre de l'extérieur.**
+## Licence
 
----
-
-## 🚀 Démarrage Rapide
-
-### Stack Technique
-* **Frontend** : React 19, TypeScript, TailwindCSS 4, Vite
-* **State** : Zustand (UI) + Context API / useReducer (Document)
-* **Édition** : CodeMirror, dnd-kit (Drag&Drop)
-* **LLM** : Vertex AI / Gemini API
-* **Backend as a Service** : Firebase (Auth, Hosting)
-
-### Prérequis
-* Node.js (v18+)
-
-### Installation
-```bash
-npm install
-```
-
-### Configuration
-Créez un fichier `.env.development` à la racine :
-```env
-VITE_LOG_LEVEL=warn
-VITE_FIREBASE_API_KEY=votre_cle_api
-VITE_FIREBASE_AUTH_DOMAIN=votre_domaine
-VITE_FIREBASE_PROJECT_ID=votre_projet
-VITE_FIREBASE_STORAGE_BUCKET=votre_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=votre_id
-VITE_FIREBASE_APP_ID=votre_app_id
-```
-
-### Lancement
-```bash
-npm run dev
-```
-
-### Tests
-```bash
-npm run test
-``` 
+À définir. 
