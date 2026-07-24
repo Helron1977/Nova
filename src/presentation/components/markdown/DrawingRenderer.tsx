@@ -277,13 +277,13 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
     fill: 'none',
   }), [currentStrokeColor, currentStrokeWidth, isErasing]);
   
-  const interactionDisabled = isHeightAdjustmentMode || isEditingSettings;
+  const localInteractionDisabled = interactionDisabled || isHeightAdjustmentMode || isEditingSettings;
 
   return (
     <div 
       style={containerStyle} 
       className="nova-drawing-block my-2 group bg-white dark:bg-gray-800 shadow-sm"
-      onMouseDownCapture={() => logger.debug(`[DrawingRenderer ${block.id}] Main DIV onMouseDownCapture. Interaction Disabled: ${interactionDisabled}`)}
+      onMouseDownCapture={() => logger.debug(`[DrawingRenderer ${block.id}] Main DIV onMouseDownCapture. Interaction Disabled: ${localInteractionDisabled}`)}
     >
       <div className="flex items-center justify-between p-2 border-b dark:border-gray-700">
         <div className="flex gap-1">
@@ -296,10 +296,10 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
           >
             <Settings2 size={18} />
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleUndoLastSegment} title="Annuler dernier trait" disabled={pathSegments.length === 0 || interactionDisabled}>
+          <Button variant="ghost" size="sm" onClick={handleUndoLastSegment} title="Annuler dernier trait" disabled={pathSegments.length === 0 || localInteractionDisabled}>
             <Undo2 size={18} />
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleClearDrawing} title="Effacer tout" disabled={pathSegments.length === 0 && liveDrawingPath === "" || interactionDisabled}>
+          <Button variant="ghost" size="sm" onClick={handleClearDrawing} title="Effacer tout" disabled={(pathSegments.length === 0 && liveDrawingPath === "") || localInteractionDisabled}>
             <CircleSlash size={18} />
           </Button>
            <Button 
@@ -307,7 +307,7 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
             size="sm" 
             onClick={() => setIsErasing(!isErasing)} 
             title="Gomme"
-            disabled={interactionDisabled}
+            disabled={localInteractionDisabled}
           >
             <Eraser size={18} />
           </Button>
@@ -318,7 +318,7 @@ export const DrawingRenderer: React.FC<DrawingRendererPropsExtended> = (props) =
             size="sm" 
             onClick={handleSaveDrawing} 
             title="Sauvegarder le dessin"
-            disabled={isHeightAdjustmentMode || (isEditingSettings && !isResizingHeight)} 
+            disabled={localInteractionDisabled}
           >
             <Save size={16} className="mr-1"/>
             Sauvegarder Dessin

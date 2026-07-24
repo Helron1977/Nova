@@ -14,7 +14,6 @@ interface PersistentInputZoneProps {
   onDeleteSelectedBlocks: () => void;
   onSubmitPrompt?: (prompt: string) => void;
   isGenerating?: boolean;
-  onFocusZone?: () => void;
 }
 
 const PersistentInputZone: React.FC<PersistentInputZoneProps> = ({
@@ -25,7 +24,6 @@ const PersistentInputZone: React.FC<PersistentInputZoneProps> = ({
   onDeleteSelectedBlocks,
   onSubmitPrompt,
   isGenerating = false,
-  onFocusZone,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isDraggingOver, setIsDraggingOver] = useState(false);
