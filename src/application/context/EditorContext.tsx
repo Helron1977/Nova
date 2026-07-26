@@ -8,6 +8,7 @@ export interface EditorCommands {
   
   updateBlock: (blockId: string, originalBlock: Block, strategyPayload: UpdateStrategyPayload) => void;
   deleteBlock: (blockId: string) => void;
+  duplicateBlock: (blockId: string) => void;
   addBlockAfter: (data: { afterId: string; newBlock: Block }) => void;
   addDropZoneBlockAfter: (data: { afterId: string }) => void;
   increaseIndentation: (blockId: string) => void;

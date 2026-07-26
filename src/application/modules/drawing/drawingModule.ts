@@ -118,6 +118,7 @@ const DrawingModule: BlockModule<DrawingBlockData> = {
   menuIcon: PenTool,
   paletteLabel: 'Zone de Dessin',
   paletteKeyword: 'dessin drawing schema pen vector',
+  editActionType: 'custom',
 
   parseContent: (rawContent: string, blockId: string): DrawingBlockData => {
     logger.debug(`[DrawingModule ${blockId}] Parsing rawContent: ${rawContent.substring(0, 100)}...`);
@@ -330,7 +331,18 @@ const DrawingModule: BlockModule<DrawingBlockData> = {
       contentSummary: "[DRAWING_VECTOR_DATA_OMITTED]",
     };
   },
-  getAIPrompt: () => `[drawing] Zone de dessin vectoriel SVG. INTERDIT : ne jamais générer ou modifier son contenu interne. Bloc créé uniquement par l'utilisateur.`.trim()
+  getAIPrompt: () => `[drawing] Zone de dessin vectoriel SVG. INTERDIT : ne jamais générer ou modifier son contenu interne. Bloc créé uniquement par l'utilisateur.`.trim(),
+
+  helpDescription: `
+Ce bloc vous permet de créer une zone de **dessin à main levée** directement dans le document, sauvegardée sous forme de dessin vectoriel.
+
+### Utilisation
+Contrairement aux autres blocs de code, vous n'avez pas besoin d'écrire du texte. Cliquez simplement sur l'icône de crayon (Éditer) dans le menu du bloc pour entrer en mode dessin.
+Vous pourrez y tracer vos schémas à l'aide de la souris ou de votre doigt/stylet sur les appareils tactiles.
+
+**Redimensionnement :**
+La hauteur du canevas de dessin est ajustable en survolant le bas du bloc et en tirant sur la poignée de redimensionnement.
+`
 };
 
 export default DrawingModule; 

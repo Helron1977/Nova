@@ -215,6 +215,9 @@ export const blocksToMarkdown = (blocks: Block[]): string => {
         if (blockMetadata?.layoutWidth && blockMetadata.layoutWidth !== 'full') {
             markdownOutput += `\n<!-- layout: ${blockMetadata.layoutWidth} -->`;
         }
+        if (blockMetadata?.layoutHeight) {
+            markdownOutput += `\n<!-- layoutHeight: ${blockMetadata.layoutHeight} -->`;
+        }
     });
 
     logger.debug("[blocksToMarkdown] Serialization finished.");

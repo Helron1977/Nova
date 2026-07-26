@@ -18,6 +18,7 @@ const PaletteModule: BlockModule<PaletteBlockData> = {
   type: 'paletteBlock',
   codeBlockLanguage: 'palette',
   menuIcon: Palette,
+  editActionType: 'custom',
 
   parseContent: (rawContent: string, blockId: string): PaletteBlockData => {
     logger.debug(`[PaletteModule] Parsing content for block ${blockId}: "${rawContent.substring(0, 50)}..."`);
@@ -93,7 +94,25 @@ const PaletteModule: BlockModule<PaletteBlockData> = {
       colorsPreview: data?.colors?.map(c => `${c.name}: ${c.hex}`) || [],
     };
   },
-  getAIPrompt: () => `[palette] Thème de couleurs personnalisé. Syntaxe attendue (variables CSS) :\n\`\`\`palette\n--nom-couleur: #HEX;\n--autre-couleur: #HEX;\n\`\`\`\nGénère 3 à 5 couleurs pertinentes (noms explicites et codes HEX) lorsque l'utilisateur demande une palette.`.trim()
+  getAIPrompt: () => `[palette] Thème de couleurs personnalisé. Syntaxe attendue (variables CSS) :\n\`\`\`palette\n--nom-couleur: #HEX;\n--autre-couleur: #HEX;\n\`\`\`\nGénère 3 à 5 couleurs pertinentes (noms explicites et codes HEX) lorsque l'utilisateur demande une palette.`.trim(),
+
+  helpDescription: `
+Ce bloc permet de définir une **palette de couleurs** personnalisée sous forme de variables CSS. L'éditeur générera automatiquement des échantillons de couleur (swatches) pour prévisualiser la palette.
+
+### Syntaxe
+Le bloc attend une syntaxe similaire à celle des variables CSS, où chaque ligne définit une couleur avec son code hexadécimal.
+
+\`\`\`palette
+--primaire: #3b82f6;
+--secondaire: #10b981;
+--accent: #f59e0b;
+\`\`\`
+
+**Règles :**
+- Chaque couleur doit commencer par \`--\` suivi du nom de la couleur.
+- La valeur doit être un code couleur hexadécimal valide (\`#RRGGBB\`).
+- Vous devez terminer chaque ligne par un point-virgule \`;\`.
+`
 };
 
 export default PaletteModule;

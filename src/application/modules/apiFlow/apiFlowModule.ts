@@ -229,6 +229,33 @@ const ApiFlowModule: BlockModule<ApiFlowBlockData> = {
     `type de retour optionnel après "->", et un "[lane: nom-du-service]" optionnel ` +
     `pour indiquer quel service héberge cet endpoint. N'invente jamais un attribut ` +
     `"<- x" qui n'a pas été déclaré dans un "object" retourné par un appel antérieur.`,
+
+  helpDescription: `
+Le bloc **ApiFlow** permet de modéliser visuellement un enchaînement d'appels d'API (séquence).
+Il est très utile pour concevoir des chorégraphies de micro-services et indiquer comment les données circulent d'un appel à l'autre.
+
+### Syntaxe
+Le bloc se divise en deux parties : la définition des objets (optionnel) et les appels (obligatoire).
+
+\`\`\`apiflow
+object User: id, name, email
+object Order: id, userId, total
+
+call GET /users/{id} -> User [lane: user-service]
+call POST /orders(userId <- id, total) -> Order [lane: order-service]
+\`\`\`
+
+#### Objets
+- Format : \`object NomObjet: propriete1, propriete2\`
+- Permet de lister les données retournées par une entité.
+
+#### Appels (calls)
+- **Format basique** : \`call METHOD /path\`
+- **Type de retour** : Ajoutez \`-> NomObjet\` pour indiquer ce que l'API renvoie.
+- **Paramètres liés** : \`(param <- attribut)\` indique que "param" prend la valeur de "attribut" qui a été retourné par un appel précédent.
+- **Paramètres locaux** : \`(param)\` indique un paramètre de l'appel sans liaison.
+- **Lignes d'eau (Lanes)** : Ajoutez \`[lane: nom-du-service]\` pour indiquer quel micro-service traite cet appel.
+`
 };
 
 export default ApiFlowModule;

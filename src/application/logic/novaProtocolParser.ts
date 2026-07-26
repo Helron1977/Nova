@@ -158,7 +158,7 @@ Blocs standard Markdown :
 - Tableau Markdown simple : \`| Col | Col |\\n|---|---|\\n| val | val |\`
 - Séparateur : \`---\`
 - Citation : \`> texte\`
-- Image : \`![alt](url)\`
+- Image : \`![alt](url)\` (IMPORTANT : N'utilisez que de vraies URLs absolues et courtes (ex: Unsplash, Pexels). Interdiction formelle d'utiliser des Data URIs base64 ou des URLs de recherche Google très longues.)
 
 Blocs custom Nova :
 (Voir la section des instructions spécifiques aux blocs ci-dessous pour la syntaxe exacte de la carte, des palettes, de l'espacement, etc.)

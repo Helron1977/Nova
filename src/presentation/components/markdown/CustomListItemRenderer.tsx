@@ -45,6 +45,12 @@ const CustomListItemRenderer: React.FC<CustomListItemRendererProps> = ({ block, 
   const [clickCoords, setClickCoords] = useState<{ x: number, y: number } | null>(null);
 
   const handleClick = (e: React.MouseEvent) => {
+    // Si l'utilisateur est en train de sélectionner du texte, on ne passe pas en mode édition
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
+    
     setClickCoords({ x: e.clientX, y: e.clientY });
     setActiveBlockId(id);
   };

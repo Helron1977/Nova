@@ -22,44 +22,50 @@ const logger = new PinoLogger();
 export interface BlockRendererDispatcherProps {
   block: Block;
   listIndex?: number;
+  isEditingSource?: boolean;
+  setIsEditingSource?: (isEditing: boolean) => void;
 }
 
 export const BlockRendererDispatcher: React.FC<BlockRendererDispatcherProps> = ({
   block,
   listIndex,
+  isEditingSource,
+  setIsEditingSource,
 }) => {
 
   let module;
   let customDataToPass: any;
 
-  if (block.type === 'code') {
-    const codeBlock = block as CodeBlock;
-    const language = codeBlock.content.language;
-    if (language) {
-      module = getBlockModuleByCodeLanguage(language);
-      if (module) {
-        if (module.parseContent) {
-          try {
-            customDataToPass = module.parseContent(codeBlock.content.code, block.id);
-          } catch (e) {
-            logger.error(`[BlockRendererDispatcher ID ${block.id}] Erreur parsing code par module "${module.type}":`, e);
+  if (!isEditingSource) {
+    if (block.type === 'code') {
+      const codeBlock = block as CodeBlock;
+      const language = codeBlock.content.language;
+      if (language) {
+        module = getBlockModuleByCodeLanguage(language);
+        if (module) {
+          if (module.parseContent) {
+            try {
+              customDataToPass = module.parseContent(codeBlock.content.code, block.id);
+            } catch (e) {
+              logger.error(`[BlockRendererDispatcher ID ${block.id}] Erreur parsing code par module "${module.type}":`, e);
+              customDataToPass = (block.content as any)?.customBlockData;
+            }
+          } else {
             customDataToPass = (block.content as any)?.customBlockData;
           }
-        } else {
-          customDataToPass = (block.content as any)?.customBlockData;
         }
       }
-    }
-  } else {
-    module = getBlockModuleByType(block.type);
-    if (module) {
-      if ((block.content as any)?.customBlockData) {
-        customDataToPass = (block.content as any).customBlockData;
-      } else if (module.parseContent) {
-        try {
-          customDataToPass = module.parseContent(block.content as any, block.id); 
-        } catch (e) {
-          logger.error(`[BlockRendererDispatcher ID ${block.id}] Erreur fallback parsing par module "${module.type}":`, e);
+    } else {
+      module = getBlockModuleByType(block.type);
+      if (module) {
+        if ((block.content as any)?.customBlockData) {
+          customDataToPass = (block.content as any).customBlockData;
+        } else if (module.parseContent) {
+          try {
+            customDataToPass = module.parseContent(block.content as any, block.id); 
+          } catch (e) {
+            logger.error(`[BlockRendererDispatcher ID ${block.id}] Erreur fallback parsing par module "${module.type}":`, e);
+          }
         }
       }
     }
@@ -101,6 +107,8 @@ export const BlockRendererDispatcher: React.FC<BlockRendererDispatcherProps> = (
           block={block as CodeBlock}
           listIndex={listIndex ?? 0}
           index={0}
+          isEditingSource={isEditingSource}
+          setIsEditingSource={setIsEditingSource}
         />
       );
     case 'mermaid':

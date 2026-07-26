@@ -39,15 +39,15 @@ export class PinoLogger implements ILogger {
     this.logger.info(`Logger initialized with level: ${levelToSet}`);
   }
 
-  log(message: string, ...optionalParams: any[]): void {
+  log(message: string, ...optionalParams: unknown[]): void {
     this.logger.info(message, ...optionalParams);
   }
 
-  warn(message: string, ...optionalParams: any[]): void {
+  warn(message: string, ...optionalParams: unknown[]): void {
     this.logger.warn(message, ...optionalParams);
   }
 
-  error(message: string, error?: Error | unknown, ...optionalParams: any[]): void {
+  error(message: string, error?: Error | unknown, ...optionalParams: unknown[]): void {
     if (error instanceof Error) {
       // Pino gère bien les objets Error directement
       this.logger.error({ err: error }, message, ...optionalParams);
@@ -59,7 +59,7 @@ export class PinoLogger implements ILogger {
     }
   }
 
-  debug(message: string, ...optionalParams: any[]): void {
+  debug(message: string, ...optionalParams: unknown[]): void {
     this.logger.debug(message, ...optionalParams);
   }
 } 

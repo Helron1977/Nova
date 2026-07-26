@@ -1,13 +1,6 @@
 import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
-// ---> AJOUT D'UN LOG POUR VÉRIFIER LES VARIABLES <--- 
-console.log("[Firebase Config] Reading environment variables:");
-console.log("VITE_FIREBASE_API_KEY:", import.meta.env.VITE_FIREBASE_API_KEY ? 'Chargée' : 'NON CHARGÉE'); // Ne pas logger la clé elle-même
-console.log("VITE_FIREBASE_AUTH_DOMAIN:", import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
-console.log("VITE_FIREBASE_PROJECT_ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
-console.log("VITE_LOG_LEVEL (for comparison):", import.meta.env.VITE_LOG_LEVEL);
-
 // Récupérer les variables d'environnement (préfixées par VITE_)
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

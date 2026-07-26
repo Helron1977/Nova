@@ -77,6 +77,14 @@ const CustomMermaidRenderer = React.forwardRef<
     const lastPanPos = useRef<{ x: number, y: number } | null>(null);
     const wasPanningRef = useRef(false);
 
+    const wasEditingRef = useRef(isEditing);
+    useEffect(() => {
+      if (isEditing && !wasEditingRef.current) {
+        setEditedCode(code);
+      }
+      wasEditingRef.current = isEditing;
+    }, [isEditing, code]);
+
     // --- Effet pour le Zoom centré (Ctrl + Molette) --- //
     useEffect(() => {
       const wrapper = wrapperRef.current;

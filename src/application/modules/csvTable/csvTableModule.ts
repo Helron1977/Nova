@@ -95,8 +95,8 @@ const CsvTableModule: BlockModule<CsvTableData> = {
   displayName: 'Tableau CSV', // Ajout pour la créabilité potentielle
   menuIcon: TableProperties,
   codeBlockLanguage: 'csv', // MODIFIÉ: de codeLanguage à codeBlockLanguage
-  paletteLabel: 'Tableau de données (CSV)',
-  paletteKeyword: 'tableau table csv data',
+  // paletteLabel et paletteKeyword retirés car le tableau est déjà présent en dur dans les baseOptions du menu (+)
+
 
   parseContent: (rawContent: string, blockId: string): CsvTableData => {
     logger.debug(`[CsvTableModule] Parsing CSV pour le bloc ${blockId}. Contenu brut (début): "${rawContent.substring(0, 100)}..."`);
@@ -192,7 +192,24 @@ const CsvTableModule: BlockModule<CsvTableData> = {
       contentSummary: "[CSV_DATA_OMITTED_FOR_TOKENS]",
     };
   },
-  getAIPrompt: () => `[csv] Tableau de données CSV éditable. Syntaxe: \`\`\`csv\ncol1,col2,col3\nval1,val2,val3\n\`\`\` Utilise CE FORMAT (et non la syntaxe Markdown \`| col |\`) quand les données sont nombreuses ou nécessitent une édition cellule par cellule.`.trim()
+  getAIPrompt: () => `[csv] Tableau de données CSV éditable. Syntaxe: \`\`\`csv\ncol1,col2,col3\nval1,val2,val3\n\`\`\` Utilise CE FORMAT (et non la syntaxe Markdown \`| col |\`) quand les données sont nombreuses ou nécessitent une édition cellule par cellule.`.trim(),
+  
+  helpDescription: `
+Ce bloc affiche un **tableau de données** avec des fonctionnalités avancées (tri, édition cellule par cellule) basé sur le format CSV.
+
+### Syntaxe
+Le bloc attend des données séparées par des virgules (CSV standard). La première ligne est toujours considérée comme la ligne d'en-tête (colonnes).
+
+\`\`\`csv
+Nom,Âge,Ville
+Alice,30,Paris
+Bob,25,Lyon
+Charlie,35,Marseille
+\`\`\`
+
+**Note :**
+Ce format est préféré aux tableaux Markdown (\`| Colonne |\`) lorsque les données sont volumineuses ou qu'elles nécessitent d'être éditées facilement avec l'interface type tableur incluse dans le bloc.
+`
 };
 
 export default CsvTableModule;

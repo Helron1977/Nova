@@ -94,6 +94,27 @@ const blocksReducer = (state: BlocksState, action: BlockAction): BlocksState => 
                 revisionCount: state.revisionCount + 1
             };
 
+        case 'DUPLICATE_BLOCK': {
+            const { blockId } = action.payload;
+            const targetIndex = state.blocks.findIndex(block => block.id === blockId);
+            
+            if (targetIndex === -1) {
+                logger.warn(`[blocksReducer] DUPLICATE_BLOCK: blockId ${blockId} not found.`);
+                return state;
+            }
+
+            const blockToDuplicate = state.blocks[targetIndex];
+            // On utilise blockIdForActions pour éviter la confusion avec les ids générés par dnd-kit
+            const newBlock: Block = {
+                ...JSON.parse(JSON.stringify(blockToDuplicate)),
+                id: uuidv4() // Assigner un nouvel ID unique
+            };
+
+            const newBlocksArray = [...state.blocks];
+            newBlocksArray.splice(targetIndex + 1, 0, newBlock); // Insérer juste après
+            return { ...state, blocks: newBlocksArray, revisionCount: state.revisionCount + 1 };
+        }
+
         case 'UPDATE_BLOCK': {
             const { blockId, updateStrategy } = action.payload;
             const originalBlockIndex = state.blocks.findIndex(block => block.id === blockId);
@@ -108,25 +129,32 @@ const blocksReducer = (state: BlocksState, action: BlockAction): BlocksState => 
             let updatedBlock: Block;
             if (updateStrategy.type === 'UPDATE_SOURCE_FOR_MODULE') {
                 const { newRawSource, moduleType } = updateStrategy;
+                console.log("[useBlocksReducer] UPDATE_SOURCE_FOR_MODULE for block", blockId, "moduleType:", moduleType);
                 let moduleForUpdate = getBlockModuleByCodeLanguage(moduleType);
                 if (!moduleForUpdate) moduleForUpdate = getBlockModuleByType(moduleType);
+                console.log("[useBlocksReducer] Found module:", !!moduleForUpdate, "has updateBlockFromSource:", !!(moduleForUpdate && moduleForUpdate.updateBlockFromSource));
 
                 if (moduleForUpdate && moduleForUpdate.updateBlockFromSource) {
                     updatedBlock = moduleForUpdate.updateBlockFromSource(currentBlockFromState, newRawSource, blockId);
+                    console.log("[useBlocksReducer] updatedBlock from source:", updatedBlock);
                 } else if (currentBlockFromState.type === 'mermaid' && moduleType === 'mermaid') {
                     updatedBlock = {
                         ...(currentBlockFromState as MermaidBlock),
                         content: { code: newRawSource },
-                        rawMarkdown: `\`\`\`mermaid\\n${newRawSource}\\n\`\`\``
+                        rawMarkdown: `\`\`\`mermaid\n${newRawSource}\n\`\`\``
                     };
                 } else if (currentBlockFromState.type === 'code') {
                     const lang = (currentBlockFromState as CodeBlock).content.language || 'text';
                     updatedBlock = {
                         ...(currentBlockFromState as CodeBlock),
                         content: { ...((currentBlockFromState as CodeBlock).content), code: newRawSource },
-                        rawMarkdown: `\`\`\`${lang}\\n${newRawSource}\\n\`\`\``
+                        rawMarkdown: `\`\`\`${lang}\n${newRawSource}\n\`\`\``
                     };
-                } else return state;
+                    console.log("[useBlocksReducer] updatedBlock as code:", updatedBlock);
+                } else {
+                    console.log("[useBlocksReducer] update failed, returning state");
+                    return state;
+                }
             } else if (updateStrategy.type === 'UPDATE_METADATA') {
                 updatedBlock = {
                     ...currentBlockFromState,

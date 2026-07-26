@@ -85,6 +85,7 @@ export interface UniversalBlockMetadata {
   originalLanguage?: string;  // Pour les blocs custom (ex: palette) parsés depuis un bloc de code, stocke la langue d'origine (ex: 'palette')
   customBlockType?: string;   // Pour marquer un bloc custom explicitement (ex: 'paletteBlock')
   layoutWidth?: 'full' | 'half' | 'third' | 'quarter'; // Pour la disposition flexible (largeur du bloc)
+  layoutHeight?: string; // Pour définir explicitement la hauteur du bloc (ex: '400px')
   isNewBlock?: boolean;
   // Tous les autres champs spécifiques qui pourraient exister (ex: align pour les tables) sont gérés au niveau du `content` du bloc.
   [key: string]: any;
@@ -745,13 +746,21 @@ export const markdownToBlocks = (markdown: string): Block[] => {
       // AJOUT: Intercepter les commentaires HTML de layout pour les appliquer au bloc précédent
       if (node.type === 'html') {
           const htmlNode = node as import('mdast').HTML;
-          const layoutMatch = htmlNode.value.match(/<!--\s*layout:\s*(half|third|quarter|full)\s*-->/i);
-          if (layoutMatch) {
-              if (blocks.length > 0) {
-                  blocks[blocks.length - 1].metadata.layoutWidth = layoutMatch[1].toLowerCase() as any;
-              }
-              return; // Ne pas traiter ce commentaire HTML comme un bloc
+          const layoutWidthMatch = htmlNode.value.match(/<!--\s*layout:\s*(half|third|quarter|full)\s*-->/i);
+          const layoutHeightMatch = htmlNode.value.match(/<!--\s*layoutHeight:\s*([^\s>]+)\s*-->/i);
+          
+          let parsedMetadata = false;
+
+          if (layoutWidthMatch && blocks.length > 0) {
+              blocks[blocks.length - 1].metadata.layoutWidth = layoutWidthMatch[1].toLowerCase() as any;
+              parsedMetadata = true;
           }
+          if (layoutHeightMatch && blocks.length > 0) {
+              blocks[blocks.length - 1].metadata.layoutHeight = layoutHeightMatch[1];
+              parsedMetadata = true;
+          }
+
+          if (parsedMetadata) return; // Ne pas traiter ce commentaire HTML comme un bloc
       }
 
       // Utiliser getRawMarkdownFromNode pour obtenir le slice de Markdown pour chaque noeud de haut niveau

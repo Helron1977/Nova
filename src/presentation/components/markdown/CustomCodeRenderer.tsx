@@ -128,7 +128,7 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
 }, ref: ForwardedRef<HTMLDivElement>) => {
   logger.debug(`[CustomCodeRenderer ID: ${block.id}] Rendering block. Type: ${block.type}, Language from content: ${(block.content as CodeBlock['content'])?.language}`);
   const { activeBlockId, setActiveBlockId, updateBlock, deleteBlock} = useEditorCommands();
-  const isEditing = activeBlockId === block.id;
+  const isEditing = activeBlockId === block.id || rest.isEditingSource;
   const { id, metadata, type } = block;
 
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageMode>(() => {
@@ -145,7 +145,7 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
 
   logger.debug(`[CustomCodeRenderer ID: ${id}] Module found for language '${moduleLanguage}':`, module ? `Type: ${module.type}, Has Renderer: ${!!module.RendererComponent}` : 'No module found');
 
-  if (module && module.RendererComponent) {
+  if (module && module.RendererComponent && !rest.isEditingSource) {
     logger.debug(`[CustomCodeRenderer ${id}] Module trouvé pour lang "${contentForModule?.language}". Utilisation de RendererComponent du module.`);
     const Renderer = module.RendererComponent;
     const customData = module.parseContent ? module.parseContent(contentForModule?.code || '', id) : {};
@@ -194,6 +194,7 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
       updateBlock(id, block, { type: 'REPLACE_WITH_BLOCKS', newBlocks });
     }
     setActiveBlockId(null);
+    if (rest.setIsEditingSource) rest.setIsEditingSource(false);
   };
 
   const handleEditorCancel = useCallback(() => {
@@ -203,7 +204,8 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
                          : 'text';
     setSelectedLanguage(originalLang);
     setActiveBlockId(null);
-  }, [type, contentForModule, setActiveBlockId]);
+    if (rest.setIsEditingSource) rest.setIsEditingSource(false);
+  }, [type, contentForModule, setActiveBlockId, rest]);
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = event.target.value as LanguageMode;
@@ -274,7 +276,23 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
     );
   }
 
-  if (isEditing && type === 'code' && !module) {
+  if (isEditing && type === 'code' && (!module || rest.isEditingSource)) {
+    if (module && rest.isEditingSource) {
+      return (
+        <div ref={ref} style={{ marginLeft: calculatedMarginLeft }} {...rest} className="relative nova-code-block my-2">
+          <CoreBlockEditor
+            blockId={id}
+            initialContent={initialEditorContent}
+            onSave={handleEditorSave}
+            onCancel={handleEditorCancel}
+            languageMode={selectedLanguage}
+            placeholder="Saisir le DSL..."
+            autoFocus={true}
+          />
+        </div>
+      );
+    }
+
     return (
       <div ref={ref} style={{ marginLeft: calculatedMarginLeft }} {...rest} className="relative nova-code-block my-2">
         <div className="cm-editor-wrapper cm-code-editor-wrapper w-full p-2 border border-blue-500 rounded-md bg-white dark:bg-gray-900">
@@ -322,7 +340,7 @@ const CustomCodeRendererComponent = forwardRef<HTMLDivElement, CustomCodeRendere
       <pre className="p-3 bg-gray-100 dark:bg-gray-800 rounded overflow-x-auto text-sm" tabIndex={0}>
         <code className={displayLanguageClass}>{displayCode}</code>
       </pre>
-      {type === 'code' && !module && (
+      {type === 'code' && (!module || rest.isEditingSource) && (
          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); deleteBlock(id); }}

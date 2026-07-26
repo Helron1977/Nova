@@ -59,6 +59,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ blocks, isSelection
   const rendererContainerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isSelectionModeActive) return;
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('.controls')) return;
     if ((event.target as HTMLElement).closest('.cm-editor-container, input, textarea, button, .nova-drawing-block')) return;

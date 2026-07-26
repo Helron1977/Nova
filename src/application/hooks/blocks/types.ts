@@ -41,6 +41,7 @@ export type BlockAction =
   | { type: 'ADD_BLOCK_AT_END'; payload: { newBlock: Block }; }
   | { type: 'TOGGLE_SELECTION_MODE'; }
   | { type: 'TOGGLE_BLOCK_SELECTION'; payload: { blockId: string }; }
+  | { type: 'DUPLICATE_BLOCK'; payload: { blockId: string }; }
   | { type: 'CLEAR_BLOCK_SELECTION'; }
   | { type: 'DELETE_SELECTED_BLOCKS'; }
   | { type: 'SET_SELECTED_BLOCKS_BATCH'; payload: { blockIds: string[]; append?: boolean } }

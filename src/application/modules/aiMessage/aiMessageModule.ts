@@ -31,7 +31,12 @@ const AiMessageModule: BlockModule<AiMessageData> = {
     };
   },
 
-  getAIPrompt: () => ''
+  getAIPrompt: () => '',
+
+  helpDescription: `
+Ce bloc est généré automatiquement par l'assistant Nova pour afficher ses réponses. 
+Il n'a pas de syntaxe DSL particulière et n'est généralement pas créé manuellement par l'utilisateur.
+`
 };
 
 export default AiMessageModule;

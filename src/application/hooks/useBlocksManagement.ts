@@ -59,6 +59,10 @@ export const useBlocksManagement = (initialBlocks: Block[]) => {
     dispatch({ type: 'ADD_DROPZONE_BLOCK_AFTER', payload: data });
   }, []);
 
+  const handleDuplicateBlock = useCallback((blockId: string) => {
+      dispatch({ type: 'DUPLICATE_BLOCK', payload: { blockId } });
+  }, []);
+
   const handleIncreaseIndentation = useCallback((blockId: string) => {
       dispatch({ type: 'INCREASE_INDENTATION', payload: { blockId } });
   }, []);
@@ -93,6 +97,7 @@ export const useBlocksManagement = (initialBlocks: Block[]) => {
     requestBlockUpdate,
     handleAddBlockAfter,
     handleAddDropZoneBlockAfter,
+    handleDuplicateBlock,
     handleIncreaseIndentation,
     handleDecreaseIndentation,
     handleAddSummaryBlock,

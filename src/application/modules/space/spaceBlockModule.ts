@@ -66,7 +66,20 @@ const SpaceBlockModule: BlockModule<SpaceBlockData> = {
       height: data?.height || 20,
     };
   },
-  getAIPrompt: () => `[space] Espacement vertical. Syntaxe: \`\`\`space\nh=N\n\`\`\` (N=pixels, ex: h=20)`.trim()
+  getAIPrompt: () => `[space] Espacement vertical. Syntaxe: \`\`\`space\nh=N\n\`\`\` (N=pixels, ex: h=20)`.trim(),
+  
+  helpDescription: `
+L'espacement permet de créer un vide vertical entre deux blocs pour aérer votre document.
+
+### Syntaxe
+Le bloc d'espace est configuré par une seule ligne indiquant la hauteur en pixels :
+\`\`\`space
+h=30
+\`\`\`
+
+**Paramètres :**
+- \`h\` : La hauteur de l'espacement en pixels (par défaut à 20).
+  `
 };
 
 export default SpaceBlockModule;

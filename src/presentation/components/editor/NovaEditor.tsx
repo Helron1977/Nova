@@ -6,11 +6,9 @@ import { Block } from '../../../application/logic/markdownParser';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { UpdateStrategyPayload } from '../../../application/hooks/useBlocksManagement';
 import { PinoLogger } from '@/infrastructure/logging/PinoLogger';
-import { getBlockModules } from '../../../application/logic/blockRegistry';
-import { CommandPalette, type CommandOption } from '../common/CommandPalette';
+import { CommandPalette } from '../common/CommandPalette';
 import { EditorProvider } from '@/application/context/EditorContext';
-import { createBlockFromAction } from '../../../application/logic/blockFactory';
-import { Pilcrow, Heading1, Heading2, SquareCode, Image as ImageIcon, Quote, Minus, UploadCloud, ListChecks, Bot } from 'lucide-react';
+import { useCommandPaletteOptions } from '../../../application/hooks/useCommandPaletteOptions';
 
 interface NovaEditorProps {
   blocks: Block[];
@@ -21,6 +19,7 @@ interface NovaEditorProps {
   setSelectedBlocksBatch: (blockIds: string[], append?: boolean) => void; // PROP AJOUTÉE ICI
   onDragEnd: (event: DragEndEvent) => void;
   onDeleteBlock: (idToDelete: string) => void;
+  onDuplicateBlock: (blockId: string) => void;
   onUpdateBlockContent: (blockId: string, originalBlock: Block, strategyPayload: UpdateStrategyPayload) => void;
   onAddBlockAfter: (data: { afterId: string; newBlock: Block }) => void;
   onAddDropZoneBlockAfter: (data: { afterId: string }) => void;
@@ -38,6 +37,7 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
   setSelectedBlocksBatch, // PROP DÉSTRUCTURÉE ICI
   onDragEnd,
   onDeleteBlock,
+  onDuplicateBlock,
   onAddBlockAfter,
   onAddDropZoneBlockAfter,
   onUpdateBlockContent,
@@ -46,7 +46,11 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
   handleAddSummaryBlock,
 }) => {
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -65,67 +69,48 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
   }, [blocks]);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = React.useState(false);
+  const [paletteAnchor, setPaletteAnchor] = React.useState<HTMLElement | null>(null);
+  const [paletteContextBlockId, setPaletteContextBlockId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
+        setPaletteAnchor(null);
+        setPaletteContextBlockId(null);
         setIsCommandPaletteOpen(true);
       }
     };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
-
-  const commandOptions: CommandOption[] = useMemo(() => {
-    const appendBlock = (actionKey: string) => {
-      const lastBlockId = blocks.length > 0 ? blocks[blocks.length - 1].id : '';
-      const newBlock = createBlockFromAction(actionKey, 0);
-      if (newBlock) {
-        onAddBlockAfter({ afterId: lastBlockId, newBlock });
-        setTimeout(() => window.dispatchEvent(new CustomEvent('nova-set-active-block', { detail: newBlock.id })), 50);
-      }
+    
+    const handleOpenPalette = (e: Event) => {
+      const customEvent = e as CustomEvent<{ blockId: string; anchorElement: HTMLElement }>;
+      setPaletteContextBlockId(customEvent.detail.blockId);
+      setPaletteAnchor(customEvent.detail.anchorElement);
+      setIsCommandPaletteOpen(true);
     };
 
-    const baseOptions: CommandOption[] = [
-      { id: 'text', label: 'Texte (Paragraphe)', keyword: 'text paragraphe', Icon: Pilcrow, action: () => appendBlock('paragraph') },
-      { id: 'h1', label: 'Titre 1', keyword: 'h1 titre 1', Icon: Heading1, action: () => appendBlock('heading1') },
-      { id: 'h2', label: 'Titre 2', keyword: 'h2 titre 2', Icon: Heading2, action: () => appendBlock('heading2') },
-      { id: 'code', label: 'Bloc de code', keyword: 'code script', Icon: SquareCode, action: () => appendBlock('code') },
-      { id: 'image', label: 'Image', keyword: 'image photo', Icon: ImageIcon, action: () => appendBlock('image') },
-      { id: 'quote', label: 'Citation', keyword: 'quote citation', Icon: Quote, action: () => appendBlock('blockquote') },
-      { id: 'divider', label: 'Ligne de séparation', keyword: 'divider ligne separateur', Icon: Minus, action: () => appendBlock('thematicBreak') },
-      { id: 'summary', label: 'Sommaire', keyword: 'summary sommaire', Icon: ListChecks, action: () => {
-        if (handleAddSummaryBlock) handleAddSummaryBlock();
-      }},
-      { id: 'dropzone', label: 'Zone de Dépôt', keyword: 'dropzone upload fichier', Icon: UploadCloud, action: () => {
-        const lastBlockId = blocks.length > 0 ? blocks[blocks.length - 1].id : '';
-        onAddDropZoneBlockAfter({ afterId: lastBlockId });
-      }},
-      // Commande IA ajoutée à la palette !
-      { id: 'ai', label: 'Demander à l\'IA', keyword: 'ia ai prompt agent', Icon: Bot, action: () => {
-         const aiInput = document.getElementById('nova-agent-input');
-         if (aiInput) aiInput.focus();
-      }}
-    ];
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('nova-open-palette', handleOpenPalette);
+    
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('nova-open-palette', handleOpenPalette);
+    };
+  }, []);
 
-    const dynamicOptions: CommandOption[] = getBlockModules()
-      .filter(m => m.paletteLabel && m.paletteKeyword)
-      .map(m => ({
-        id: m.type,
-        label: m.paletteLabel!,
-        keyword: m.paletteKeyword!,
-        Icon: (m.menuIcon || m.icon) as any,
-        action: () => appendBlock(`module_${m.codeBlockLanguage || m.type}`)
-    }));
-
-    return [...baseOptions, ...dynamicOptions];
-  }, [blocks, onAddBlockAfter, onAddDropZoneBlockAfter, handleAddSummaryBlock]);
+  const commandOptions = useCommandPaletteOptions({
+    blocks,
+    paletteContextBlockId,
+    onAddBlockAfter,
+    onAddDropZoneBlockAfter,
+    handleAddSummaryBlock
+  });
 
   return (
     <EditorProvider
       updateBlock={onUpdateBlockContent}
       deleteBlock={onDeleteBlock}
+      duplicateBlock={onDuplicateBlock}
       addBlockAfter={onAddBlockAfter}
       addDropZoneBlockAfter={onAddDropZoneBlockAfter}
       increaseIndentation={onIncreaseIndentation}
@@ -137,6 +122,7 @@ export const NovaEditor: React.FC<NovaEditorProps> = React.memo(({
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         options={commandOptions}
+        anchorElement={paletteAnchor}
       />
       <DndContext
         sensors={sensors}

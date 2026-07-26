@@ -37,9 +37,14 @@ const PersistentInputZone: React.FC<PersistentInputZoneProps> = ({
 
   const addBlocks = useCallback((blocksToAdd: Block[]) => {
     if (blocksToAdd && blocksToAdd.length > 0) {
+      let lastId = '';
       blocksToAdd.forEach(block => {
-        onAddBlock({ ...block, id: uuidv4() }); // Assure un ID unique
+        const newId = uuidv4();
+        lastId = newId;
+        onAddBlock({ ...block, id: newId }); // Assure un ID unique
       });
+      // Auto-scroll vers le dernier bloc ajouté
+      setTimeout(() => window.dispatchEvent(new CustomEvent('nova-set-active-block', { detail: lastId })), 50);
     }
   }, [onAddBlock]);
 
@@ -147,7 +152,7 @@ const PersistentInputZone: React.FC<PersistentInputZoneProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-gray-100 dark:bg-gray-900 p-3 border-t border-gray-300 dark:border-gray-700 shadow-top z-50 
+      className={`fixed bottom-0 left-0 right-0 bg-gray-100 dark:bg-gray-900 p-3 border-t border-gray-300 dark:border-gray-700 shadow-top z-50 print:hidden
                   ${isDraggingOver ? 'outline-dashed outline-2 outline-offset-[-4px] outline-blue-500 dark:outline-blue-400' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}

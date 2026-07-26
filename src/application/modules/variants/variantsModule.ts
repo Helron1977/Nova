@@ -152,6 +152,29 @@ const VariantsModule: BlockModule<VariantsBlockData> = {
     'Reformulation dynamique et légère.\n```\n' +
     `Toujours inclure la version "original" en première variante pour ne rien perdre. ` +
     `2 à 4 variantes maximum, chacune complète et autonome (pas de renvoi entre variantes).`,
+    
+  helpDescription: `
+Ce bloc permet de comparer et d'afficher plusieurs versions alternatives (variantes) d'un même texte (par exemple, différents tons ou longueurs).
+
+### Syntaxe
+Chaque variante est délimitée par un séparateur \`--- nom de la variante ---\` seul sur une ligne.
+
+\`\`\`variants
+--- original ---
+Texte de départ inchangé.
+
+--- ton formel ---
+Reformulation dans un registre plus soutenu et professionnel.
+
+--- ton enjoué ---
+Reformulation dynamique et légère !
+\`\`\`
+
+**Règles :**
+- Le nom de la variante doit être entouré de \`---\`
+- Le contenu de la variante se trouve juste en dessous du séparateur.
+- Il est recommandé de toujours conserver la version \`--- original ---\` pour référence.
+`
 };
 
 export default VariantsModule;

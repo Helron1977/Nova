@@ -24,6 +24,14 @@ export interface BlockEditorProps<TData = Record<string, any>> {
 }
 
 /**
+ * Définit le comportement du bouton d'édition (</>) pour un module.
+ */
+export type EditActionType = 
+  | 'source'   // Comportement par défaut : bascule sur l'éditeur DSL texte générique (CoreBlockEditor)
+  | 'custom'   // Déclenche le mode édition du composant lui-même (via activeBlockId)
+  | 'none';    // Masque le bouton d'édition pour ce module
+
+/**
  * Définit la structure qu'un module de bloc custom doit fournir pour s'intégrer au système.
  */
 export interface BlockModule<TData = Record<string, any>, TRawContent = string> {
@@ -95,9 +103,17 @@ export interface BlockModule<TData = Record<string, any>, TRawContent = string> 
   // Sera agrégé dans le contexte LLM pour apprendre à l'IA comment manipuler ce bloc.
   getAIPrompt?: () => string;
 
+  // NOUVEAU:  // Optionnel: Aide textuelle formatée (Markdown ou noeud React) décrivant le DSL pour les utilisateurs.
+  // Sera affichée dans le modal d'aide. Si absente, `getAIPrompt` peut servir de repli.
+  helpDescription?: string | React.ReactNode;
+
+  // NOUVEAU: Déclare le comportement du bouton d'édition (</>)
+  // Si non fourni, le comportement par défaut sera 'source'.
+  editActionType?: EditActionType;
+
   // Optionnel: Le langage utilisé dans un bloc de code (ex: ```mermaid) 
   // qui doit être géré par ce module. 
   // codeLanguage?: string; // Supprimé car redondant avec codeBlockLanguage et moins précis.
 
   // menuIcon?: React.ElementType; // NOUVEAU: Icône pour le menu "+"  <-- Déplacé plus haut
-} 
+}
